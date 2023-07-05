@@ -6,6 +6,7 @@ import {
   InstancedBufferAttribute,
   Scene,
   FloatType,
+  Color,
 } from 'three';
 
 import {
@@ -49,24 +50,22 @@ export default function ({ scene, renderer, camera, width, height }) {
     fragmentShader: noiseFragGlsl,
   });
 
-  const gui = new GUI();
-  const fold = gui.addFolder('Cube');
-  matUniformGui(noiseMat, fold)
-    .add('octaves').add('lacunarity').add('diminish').add('scale');
-  fold.open();
+  // const gui = new GUI();
+  // const fold = gui.addFolder('Cube');
+  // matUniformGui(noiseMat, fold)
+  //   .add('octaves').add('lacunarity').add('diminish').add('scale');
+  // fold.open();
 
   const quad = new Quad(noiseMat, renderer);
 
   const mesh = createInstances(amountSq, noiseRT.texture);
-
   scene.add(mesh);
-  // scene.add((() => {
-  //   const geo = new BoxGeometry(1, 1, 1);
-  //   const mat = new MeshBasicMaterial({ color: 0x0088FF });
-  //   const mesh = new Mesh(geo, mat);
-  //   return mesh;
-  // })());
   scene.position.z = -2;
+
+  const composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass( scene, camera ));
+  const feedback = new Feedback({ damp: .99 });
+  composer.addPass(feedback);
 
   return {
     scene,
@@ -75,19 +74,17 @@ export default function ({ scene, renderer, camera, width, height }) {
       // render({ scene: quad.mesh, camera: quad.camera, target: null });
       render({ scene: quad.mesh, camera: quad.camera, target: noiseRT });
 
-      // const buf = new Float32Array(amountSq**2 * 4);
-      // renderer.readRenderTargetPixels(noiseRT,0,0,amountSq,amountSq, buf);
-      // console.log(buf);
 
       // mesh.material.uniforms.tPos.value = noiseRT.texture;
 
       // mesh.instanceMatrix = noiseRT.texture;
       // scene.rotation.y += 0.01;
       // render({ scene: mesh });
-      render({ scene });
+      // render({ scene });
+      composer.render();
 
       return {
-        // renderSketch: false,
+        renderSketch: false,
       }
     },
   };
