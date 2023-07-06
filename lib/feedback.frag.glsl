@@ -27,15 +27,15 @@ void main() {
   }
   vec4 texelNew = texture2D( tNew, vUv );
 
-  #ifdef __main
-  vec4 res = _main(texelOld, texelNew);
-  #endif
+  // #ifdef __main
+  // vec4 res = _main(texelOld, texelNew);
+  // #endif
 
   // #ifdef damping
-  texelOld *= damp * when_gt( texelOld, 0.1 );
+  // texelOld *= damp * when_gt( texelOld, 0.1 );
   // #endif
 
 
-  gl_FragColor = max(texelNew, texelOld);
+  gl_FragColor = texelNew* .01 + texelOld;
 
 }

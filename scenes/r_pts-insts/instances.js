@@ -1,26 +1,18 @@
 import {
-  InstancedMesh,
-  BoxGeometry,
-  MeshBasicMaterial,
-  DynamicDrawUsage,
-  Object3D,
-  Vector2,
   BufferAttribute,
   BufferGeometry,
   Float32BufferAttribute,
   Mesh,
-  RawShaderMaterial,
-  Vector4,
-  PointsMaterial,
-  ShaderMaterial,
   NormalBlending,
   Points,
+  ShaderMaterial,
 } from 'three';
+
+// import sketch from '/lib/Sketch.js';
 import fragGlsl from './points.frag.glsl?raw';
 import vertGlsl from './points.vert.glsl?raw';
 
 export default function (countSq, tPos) {
-  // console.log(tPos)
   const count = countSq**2;
 
   const mat = new ShaderMaterial({

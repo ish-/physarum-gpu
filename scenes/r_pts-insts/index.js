@@ -33,7 +33,9 @@ export default function ({ scene, renderer, camera, width, height }) {
   const noiseFragGlsl = tmpFrag.replace('// <functions>', mxNoiseGlsl);
 
   const amountSq = 10;
-  const noiseRT = new WebGLRenderTarget(amountSq, amountSq, {
+
+  // velocity
+  const velRT = new WebGLRenderTarget(amountSq, amountSq, {
     type: FloatType, minFilter: NearestFilter, magFilter: NearestFilter });
   const noiseMat = new ShaderMaterial({
     uniforms: {
@@ -50,38 +52,64 @@ export default function ({ scene, renderer, camera, width, height }) {
     fragmentShader: noiseFragGlsl,
   });
 
-  // const gui = new GUI();
-  // const fold = gui.addFolder('Cube');
-  // matUniformGui(noiseMat, fold)
-  //   .add('octaves').add('lacunarity').add('diminish').add('scale');
-  // fold.open();
+  const gui = new GUI();
+  const fold = gui.addFolder('Cube');
+  matUniformGui(noiseMat, fold)
+    .add('octaves').add('lacunarity').add('diminish').add('scale');
+  fold.open();
 
-  const quad = new Quad(noiseMat, renderer);
+  const velQuad = new Quad(noiseMat, renderer);
 
-  const mesh = createInstances(amountSq, noiseRT.texture);
+  // POS
+  const posRT = new WebGLRenderTarget(amountSq, amountSq, {
+    type: FloatType, minFilter: NearestFilter, magFilter: NearestFilter });
+
+  const posFB = new Feedback({ width: amountSq, height: amountSq,
+    // initRT: posRT,
+    shader: {
+      damping: false,
+      // main: `
+      // void main (vec4 texelOld, vec4 texelNew) {
+      //   gl_FragColor = texelOld + texelNew / .01;
+      // }
+      // `
+    }
+  });
+
+  // renderer.setRenderTarget(velRT);
+  // renderer.render(velQuad.mesh, velQuad.camera);
+
+  // INSTANCES
+  const mesh = createInstances(amountSq, posRT.texture);
   scene.add(mesh);
   scene.position.z = -2;
 
-  const composer = new EffectComposer(renderer);
-  composer.addPass(new RenderPass( scene, camera ));
-  const feedback = new Feedback({ damp: .99 });
-  composer.addPass(feedback);
+  // const composer = new EffectComposer(renderer);
+  // composer.addPass(new RenderPass( scene, camera ));
+  // const feedback = new Feedback({
+  //   damp: .99,
+  //   shader: {
+  //     damping: false,
+  //   }
+  // });
+  // composer.addPass(feedback);
 
   return {
     scene,
     onRender ({ now, elapsed, delta, render }) {
       noiseMat.uniforms.time.value = elapsed/2;
-      // render({ scene: quad.mesh, camera: quad.camera, target: null });
-      render({ scene: quad.mesh, camera: quad.camera, target: noiseRT });
+      render({ scene: velQuad.mesh, camera: velQuad.camera, target: velRT });
+      posFB.render(renderer, posRT, velRT);
 
+      mesh.material.uniforms.tPos.value = posFB.textureOld.texture;
 
-      // mesh.material.uniforms.tPos.value = noiseRT.texture;
+      // mesh.material.uniforms.tPos.value = velRT.texture;
 
-      // mesh.instanceMatrix = noiseRT.texture;
+      // mesh.instanceMatrix = velRT.texture;
       // scene.rotation.y += 0.01;
       // render({ scene: mesh });
-      // render({ scene });
-      composer.render();
+      render({ scene });
+      // composer.render();
 
       return {
         renderSketch: false,
