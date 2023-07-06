@@ -1,3 +1,5 @@
+import sketch, { debug } from '/lib/Sketch';
+
 import {
   WebGLRenderTarget,
   NearestFilter,
@@ -7,14 +9,11 @@ import {
   Scene,
   FloatType,
   Color,
-} from 'three';
-
-import {
   BoxGeometry,
   MeshBasicMaterial,
   Mesh,
 } from 'three';
-import Quad from '/objs/Quad.js';
+import Quad from '/lib/Quad.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { GlitchPass } from 'three/addons/postprocessing/GlitchPass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
@@ -26,17 +25,20 @@ import { matUniformGui } from '/lib/gui.js';
 import mxNoiseGlsl from '/lib/mx-noise.glsl?raw';
 import tmpFrag from './tmp.frag.glsl?raw';
 import { GUI } from 'dat.gui';
+import QuadFrame from '/lib/QuadFrame';
+
+
 import createInstances from './instances.js';
 
-export default function ({ scene, renderer, camera, width, height }) {
+function go ({ scene, renderer, camera, width, height }) {
   const testTex = new TextureLoader().load('/assets/boxMap.jpg');
   const noiseFragGlsl = tmpFrag.replace('// <functions>', mxNoiseGlsl);
 
   const amountSq = 10;
 
   // velocity
-  const velRT = new WebGLRenderTarget(amountSq, amountSq, {
-    type: FloatType, minFilter: NearestFilter, magFilter: NearestFilter });
+  // const velRT = new WebGLRenderTarget(amountSq, amountSq, {
+  //   type: FloatType, minFilter: NearestFilter, magFilter: NearestFilter });
   const noiseMat = new ShaderMaterial({
     uniforms: {
       opacity: { value: .6 },
@@ -52,68 +54,52 @@ export default function ({ scene, renderer, camera, width, height }) {
     fragmentShader: noiseFragGlsl,
   });
 
+  const velFrame = new QuadFrame({
+    size: amountSq,
+    material: noiseMat,
+    type: FloatType, minFilter: NearestFilter, magFilter: NearestFilter })
+
   const gui = new GUI();
   const fold = gui.addFolder('Cube');
   matUniformGui(noiseMat, fold)
     .add('octaves').add('lacunarity').add('diminish').add('scale');
   fold.open();
 
-  const velQuad = new Quad(noiseMat, renderer);
+  // const velQuad = new Quad(noiseMat);
 
   // POS
-  const posRT = new WebGLRenderTarget(amountSq, amountSq, {
-    type: FloatType, minFilter: NearestFilter, magFilter: NearestFilter });
 
-  const posFB = new Feedback({ width: amountSq, height: amountSq,
-    // initRT: posRT,
+  const posFB = new Feedback({ size: amountSq,
+    uniforms: {
+      tNew: { value: velFrame.texture },
+    },
     shader: {
       damping: false,
-      // main: `
-      // void main (vec4 texelOld, vec4 texelNew) {
-      //   gl_FragColor = texelOld + texelNew / .01;
-      // }
-      // `
     }
   });
 
-  // renderer.setRenderTarget(velRT);
-  // renderer.render(velQuad.mesh, velQuad.camera);
-
   // INSTANCES
-  const mesh = createInstances(amountSq, posRT.texture);
+  const mesh = createInstances(amountSq, posFB.texture);
   scene.add(mesh);
   scene.position.z = -2;
 
-  // const composer = new EffectComposer(renderer);
-  // composer.addPass(new RenderPass( scene, camera ));
-  // const feedback = new Feedback({
-  //   damp: .99,
-  //   shader: {
-  //     damping: false,
-  //   }
-  // });
-  // composer.addPass(feedback);
+  return function ({ now, elapsed, delta, render }) {
+    noiseMat.uniforms.time.value = elapsed/2;
+    velFrame.render();
+    posFB.render();
 
-  return {
-    scene,
-    onRender ({ now, elapsed, delta, render }) {
-      noiseMat.uniforms.time.value = elapsed/2;
-      render({ scene: velQuad.mesh, camera: velQuad.camera, target: velRT });
-      posFB.render(renderer, posRT, velRT);
+    render()
+    // debug({ texture: velFrame.texture })
 
-      mesh.material.uniforms.tPos.value = posFB.textureOld.texture;
-
-      // mesh.material.uniforms.tPos.value = velRT.texture;
-
-      // mesh.instanceMatrix = velRT.texture;
-      // scene.rotation.y += 0.01;
-      // render({ scene: mesh });
-      render({ scene });
-      // composer.render();
-
-      return {
-        renderSketch: false,
-      }
-    },
+    return { renderSketch: false }
   };
 }
+
+sketch.startRaf(go({
+  scene: sketch.scene,
+  renderer: sketch.renderer,
+  camera: sketch.camera,
+  width: sketch.W,
+  height: sketch.H,
+}))
+export default {};

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import Quad from '/objs/Quad.js';
+import Quad from '/lib/Quad.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { GlitchPass } from 'three/addons/postprocessing/GlitchPass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'

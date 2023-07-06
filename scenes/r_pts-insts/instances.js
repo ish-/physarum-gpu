@@ -8,7 +8,6 @@ import {
   ShaderMaterial,
 } from 'three';
 
-// import sketch from '/lib/Sketch.js';
 import fragGlsl from './points.frag.glsl?raw';
 import vertGlsl from './points.vert.glsl?raw';
 
