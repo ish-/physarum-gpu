@@ -1,7 +1,7 @@
 uniform float damp;
 
-uniform sampler2D tOld;
-uniform sampler2D tNew;
+uniform sampler2D tPrev;
+uniform sampler2D tInput;
 uniform int thisFrame;
 uniform vec4 resetColor;
 
@@ -24,8 +24,8 @@ void main() {
   #endif
 
   #ifndef __main
-    vec4 texelOld = texture2D( tOld, vUv );
-    vec4 texelNew = texture2D( tNew, vUv );
+    vec4 texelOld = texture2D( tPrev, vUv );
+    vec4 texelNew = texture2D( tInput, vUv );
     gl_FragColor = texelNew* .01 + texelOld;
       #ifdef damping
         texelOld *= damp * when_gt( texelOld, 0.1 );

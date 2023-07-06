@@ -18,6 +18,10 @@ import { GuiUniforms } from '/lib/gui';
 import Feedback from '/lib/Feedback';
 import QuadFrame from '/lib/QuadFrame';
 
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+import { AfterimagePass } from 'three/addons/postprocessing/AfterimagePass.js'
+
 import defaultUvVert from '/shaders/defaultUv.vert.glsl?raw';
 import opacityFrag from '/shaders/opacity.frag.glsl?raw';
 import mxNoiseGlsl from '/lib/mx-noise.glsl?raw';
@@ -28,7 +32,7 @@ import createInstances from './instances.js';
 const testTex = new TextureLoader().load('/assets/boxMap.jpg');
 const noiseFragGlsl = tmpFrag.replace('// <functions>', mxNoiseGlsl);
 
-const amountSq = 10;
+const amountSq = 200;
 
 const noiseMat = new ShaderMaterial({
   uniforms: GuiUniforms('noises', {
@@ -53,7 +57,7 @@ const velFrame = new QuadFrame({
 
 const posFB = new Feedback({ size: amountSq,
   uniforms: {
-    tNew: { value: velFrame.texture },
+    tInput: { value: velFrame.texture },
   },
   shader: {
     damping: false,
@@ -73,14 +77,19 @@ const mesh = createInstances(amountSq, posFB.texture);
 sketch.scene.add(mesh);
 sketch.scene.position.z = -2;
 
+// const composer = new EffectComposer(sketch.renderer);
+// composer.addPass(new RenderPass(sketch.scene, sketch.camera));
+// composer.addPass(new AfterimagePass(.99));
 
+sketch.initStats();
 sketch.startRaf(({ now, elapsed, delta }) => {
   noiseMat.uniforms.time.value = elapsed/2;
   velFrame.render();
   posFB.render();
 
   sketch.render();
-  // debug({ texture: velFrame.texture })
+  // composer.render();
+  // debug(velFrame);
 });
 
 export default {};

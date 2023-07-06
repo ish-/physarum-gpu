@@ -20,15 +20,15 @@ export default function (countSq, tPos) {
     // },
     uniforms: {
       time: { value: 0. },
-      pointSize: { value: 2. },
+      pointSize: { value: 1. },
       countSq: { value: countSq },
       speed: { value: 1. },
       tPos: { value: tPos },
     },
     vertexShader: vertGlsl,
     fragmentShader: fragGlsl,
-    // transparent: true,
-    // blending: NormalBlending,
+    transparent: true,
+    blending: NormalBlending,
     // // depthWrite: true,
     // depthTest: false,
   });
