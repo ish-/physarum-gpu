@@ -28,7 +28,7 @@ vec3 blendAdd(vec3 base, vec3 blend, float opacity) {
 vec4 compute () {
   // prev = blur5( tPrev, vUv, resolution.xy, normalize(vUv*2.-1.));
   vec4 prev = myBlur( tPrev, vUv, 1./resolution.xy, vec2(1., 0.));
-  vec4 inp = texture2D( tInput, vUv );
+  vec4 inp = texture2D( tInput, vUv /* / vec2(aspect, 1.) */ );
 
   return vec4(blendAdd(inp.rgb, prev.rgb, opacity), 1.);
 }

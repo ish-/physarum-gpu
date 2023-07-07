@@ -5,6 +5,7 @@ uniform sampler2D tInput;
 uniform int thisFrame;
 uniform vec4 resetColor;
 uniform vec2 resolution;
+uniform float aspect;
 
 varying vec2 vUv;
 

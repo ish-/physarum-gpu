@@ -10,9 +10,7 @@ uniform float uSpeed;
 uniform vec2 uPointer;
 uniform vec4 tFer;
 
-vec2 limit (vec2 pos) {
-  return fract(sign(pos) * pos);
-}
+// <functions>
 
 vec4 compute () {
   vec4 prev = texture2D( tPrev, vUv );
@@ -29,6 +27,6 @@ vec4 compute () {
   float dist = length(dir);
   float str = smoothstep(.5, .1, dist) * .005;
   vec2 pos = (prev + vel * .01).xy - normalize(dir) * str;
-  // pos = limit(pos);
+  pos = toRangeFract(vec2(-aspect, -1), vec2(aspect, 1), pos);
   return vec4(pos, 0., 1.);
 }

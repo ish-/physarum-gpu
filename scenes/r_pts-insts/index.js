@@ -29,15 +29,17 @@ import defaultUvVert from '/shaders/defaultUv.vert.glsl?raw';
 import opacityFrag from '/shaders/opacity.frag.glsl?raw';
 import mxNoiseGlsl from '/lib/mx-noise.glsl?raw';
 import tmpFrag from './tmp.frag.glsl?raw';
+import mathGlsl from '/shaders/math.glsl?raw';
 import positionCompGlsl from './position.comp.glsl?raw';
 import ferCompGlsl from './fer.Comp.glsl?raw';
+import { insertAfter } from '/lib/utils';
 
 import createInstances from './instances.js';
 
 const testTex = new TextureLoader().load('/assets/boxMap.jpg');
 const noiseFragGlsl = tmpFrag.replace('// <functions>', mxNoiseGlsl);
 
-const amountSq = 200;
+const amountSq = 20;
 
 const noiseMat = new ShaderMaterial({
   uniforms: GuiUniforms('velNoise', {
@@ -72,11 +74,12 @@ const posFB = new Feedback({ size: amountSq,
     tInput: velFrame.texture,
     tFer: null,
 
+    aspect: sketch.W / sketch.H,
     uPointer: { x: -10, y: -10 },
   }).open(),
   shader: {
     // damping: false,
-    compute: positionCompGlsl,
+    compute: insertAfter(positionCompGlsl, '// <functions>', mathGlsl),
   }
 });
 
@@ -98,7 +101,10 @@ const mesh = createInstances(amountSq/*, posFB.texture*/);
 sketch.scene.add(mesh);
 sketch.scene.position.z = -2;
 
-const sceneFrame = new Frame({ width: sketch.W, height: sketch.H, type: HalfFloatType });
+const sceneFrame = new Frame({
+  width: sketch.W, height: sketch.H,
+  type: HalfFloatType,
+});
 
 const ferFB = new Feedback({
   width: sketch.W / sketch.dpi,
@@ -114,6 +120,13 @@ const ferFB = new Feedback({
   }
 });
 
+sketch.addEventListener('resize', () => {
+  const { W, H } = sketch;
+  const aspect = W / H;
+  sceneFrame.setSize(W, H);
+  ferFB.setSize(W / sketch.dpi, H / sketch.dpi);
+  posFB.uniforms.aspect.value = aspect;
+})
 // posFB.uniforms.tFer.value = ferFB.texture;
 
 // const composer = new EffectComposer(sketch.renderer);
@@ -123,7 +136,7 @@ const ferFB = new Feedback({
 sketch.initStats();
 sketch.startRaf(({ now, elapsed, delta }) => {
   if (pause) return;
-  console.time('sketch.render');
+  // console.time('sketch.render');
   noiseMat.uniforms.time.value = elapsed/2;
   velFrame.render();
   posFB.render();
@@ -135,7 +148,7 @@ sketch.startRaf(({ now, elapsed, delta }) => {
   // sketch.render();
   // composer.render();
   debug(ferFB);
-  console.timeEnd('sketch.render');
+  // console.timeEnd('sketch.render');
 });
 
 export default {};
