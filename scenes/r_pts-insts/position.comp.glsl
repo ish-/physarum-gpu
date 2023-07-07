@@ -11,7 +11,7 @@ uniform vec2 uPointer;
 uniform vec4 tFer;
 
 vec2 limit (vec2 pos) {
-  return fract(pos / 1.5) * 1.5;
+  return fract(sign(pos) * pos);
 }
 
 vec4 compute (vec4 prevPos) {

@@ -81,14 +81,7 @@ window.addEventListener('pointermove', e => {
   let { pageX: x, pageY: y } = e;
   x = ((x / sketch.W) * 2 - 1);
   y = (1 - (y / sketch.H)) * 2 - 1;
-  posFB.uniforms.uPointer = { value: { x, y } };
-});
-
-window.addEventListener('pointermove', e => {
-  let { pageX: x, pageY: y } = e;
-  x = ((x / sketch.W) * 2 - 1);
-  y = (1 - (y / sketch.H)) * 2 - 1;
-  console.log({ x, y });
+  posFB.uniforms.uPointer.value = { x, y };
 });
 
 let pause = false;
@@ -145,9 +138,9 @@ sketch.startRaf(({ now, elapsed, delta }) => {
 
   sceneFrame.render(sketch);
   ferFB.render();
-  // sketch.render();
+  sketch.render();
   // composer.render();
-  debug(ferFB);
+  // debug(testTex);
 });
 
 export default {};
