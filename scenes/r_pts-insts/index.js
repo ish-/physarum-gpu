@@ -8,6 +8,7 @@ import {
   InstancedBufferAttribute,
   Scene,
   FloatType,
+  HalfFloatType,
   Color,
   BoxGeometry,
   MeshBasicMaterial,
@@ -95,7 +96,7 @@ const mesh = createInstances(amountSq, posFB.texture);
 sketch.scene.add(mesh);
 sketch.scene.position.z = -2;
 
-const sceneFrame = new Frame({ width: sketch.W, height: sketch.H, type: FloatType });
+const sceneFrame = new Frame({ width: sketch.W, height: sketch.H, type: HalfFloatType });
 
 const ferFB = new Feedback({
   uniforms: GuiUniforms('ferFB', {
@@ -138,9 +139,9 @@ sketch.startRaf(({ now, elapsed, delta }) => {
 
   sceneFrame.render(sketch);
   ferFB.render();
-  sketch.render();
+  // sketch.render();
   // composer.render();
-  // debug(testTex);
+  debug(ferFB);
 });
 
 export default {};
