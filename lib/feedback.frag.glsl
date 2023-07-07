@@ -4,6 +4,7 @@ uniform sampler2D tPrev;
 uniform sampler2D tInput;
 uniform int thisFrame;
 uniform vec4 resetColor;
+uniform vec2 resolution;
 
 varying vec2 vUv;
 
@@ -24,11 +25,11 @@ void main() {
     return;
   }
 
-  vec4 prev = texture2D( tPrev, vUv );
+  // vec4 prev = texture2D( tPrev, vUv );
 
   vec4 res = vec4(0.);
   #ifdef defineCompute
-    res = _compute(prev);
+    res = _compute();
   #endif
   // #ifndef defineCompute
   //   vec4 inp = texture2D( tInput, vUv );

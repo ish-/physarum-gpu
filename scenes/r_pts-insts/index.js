@@ -2,6 +2,7 @@ import sketch, { debug } from '/lib/Sketch';
 
 import {
   WebGLRenderTarget,
+  LinearFilter,
   NearestFilter,
   ShaderMaterial,
   TextureLoader,
@@ -29,6 +30,7 @@ import opacityFrag from '/shaders/opacity.frag.glsl?raw';
 import mxNoiseGlsl from '/lib/mx-noise.glsl?raw';
 import tmpFrag from './tmp.frag.glsl?raw';
 import positionCompGlsl from './position.comp.glsl?raw';
+import ferCompGlsl from './fer.Comp.glsl?raw';
 
 import createInstances from './instances.js';
 
@@ -92,38 +94,27 @@ window.addEventListener('keydown', e => {
 });
 
 // INSTANCES
-const mesh = createInstances(amountSq, posFB.texture);
+const mesh = createInstances(amountSq/*, posFB.texture*/);
 sketch.scene.add(mesh);
 sketch.scene.position.z = -2;
 
 const sceneFrame = new Frame({ width: sketch.W, height: sketch.H, type: HalfFloatType });
 
 const ferFB = new Feedback({
+  width: sketch.W / sketch.dpi,
+  height: sketch.H / sketch.dpi,
+  type: LinearFilter,
   uniforms: GuiUniforms('ferFB', {
-    opacity: [.99, 0., 1., .001],
+    opacity: [.99, 0.9, 1., .001],
   }, {
     tInput: sceneFrame.texture,
   }),
   shader: {
-    compute: `
-      uniform float opacity;
-
-      vec3 blendAdd(vec3 base, vec3 blend) {
-        return min(base+blend,vec3(1.0));
-      }
-      vec3 blendAdd(vec3 base, vec3 blend, float opacity) {
-        return (blendAdd(base, blend) * opacity + base * (1.0 - opacity));
-      }
-      vec4 compute (vec4 prev) {
-        vec4 inp = texture2D( tInput, vUv );
-
-        return vec4(blendAdd(inp.rgb, prev.rgb, opacity), 1.);
-      }
-    `,
+    compute: ferCompGlsl,
   }
 });
 
-posFB.uniforms.tFer.value = ferFB.texture;
+// posFB.uniforms.tFer.value = ferFB.texture;
 
 // const composer = new EffectComposer(sketch.renderer);
 // composer.addPass(new RenderPass(sketch.scene, sketch.camera));
@@ -132,16 +123,19 @@ posFB.uniforms.tFer.value = ferFB.texture;
 sketch.initStats();
 sketch.startRaf(({ now, elapsed, delta }) => {
   if (pause) return;
-
+  console.time('sketch.render');
   noiseMat.uniforms.time.value = elapsed/2;
   velFrame.render();
   posFB.render();
 
+  mesh.material.uniforms.tPos.value = posFB.texture;
   sceneFrame.render(sketch);
   ferFB.render();
+  posFB.uniforms.tFer.value = ferFB.texture;
   // sketch.render();
   // composer.render();
   debug(ferFB);
+  console.timeEnd('sketch.render');
 });
 
 export default {};
