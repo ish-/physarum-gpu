@@ -11,7 +11,6 @@ precision highp float;
 // attribute vec3 normal;
 // attribute vec2 uv;
 
-uniform float time;
 uniform float pointSize;
 uniform float countSq;
 uniform sampler2D tPos;

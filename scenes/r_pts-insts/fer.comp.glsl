@@ -1,4 +1,5 @@
 uniform float opacity;
+uniform float blur;
 
 vec4 blur5(sampler2D image, vec2 uv, vec2 resolution, vec2 direction) {
   vec4 color = vec4(0.0);
@@ -9,14 +10,23 @@ vec4 blur5(sampler2D image, vec2 uv, vec2 resolution, vec2 direction) {
   return color;
 }
 
-vec4 myBlur (sampler2D img, vec2 uv, vec2 res, vec2 direction) {
-  vec4 color = vec4(0.);
-  color += texture2D(img, uv);
-  color += texture2D(img, uv + vec2(0., res.y)); //N
-  color += texture2D(img, uv - vec2(0., res.y)); //S
-  color += texture2D(img, uv - vec2(res.x, 0.)); //W
-  color += texture2D(img, uv + vec2(res.x, 0.)); //E
-  return color / 5.;
+float myBlur (sampler2D img, vec2 uv, vec2 resolution, vec2 direction) {
+  float res = 0.;
+  res += texture2D(img, uv).r * (1. + blur);
+  float neibStr = (1. - blur / 4.);
+  res += texture2D(img, uv + vec2(0., resolution.y)).r * neibStr; //N
+  res += texture2D(img, uv - vec2(0., resolution.y)).r * neibStr; //S
+  res += texture2D(img, uv - vec2(resolution.x, 0.)).r * neibStr; //W
+  res += texture2D(img, uv + vec2(resolution.x, 0.)).r * neibStr; //E
+  return res / 5.;
+}
+
+float blendAdd(float base, float blend) {
+  return min(base+blend,1.0);
+}
+
+float blendAdd(float base, float blend, float opacity) {
+  return (blendAdd(base, blend) * opacity + base * (1.0 - opacity));
 }
 
 vec3 blendAdd(vec3 base, vec3 blend) {
@@ -27,8 +37,9 @@ vec3 blendAdd(vec3 base, vec3 blend, float opacity) {
 }
 vec4 compute () {
   // prev = blur5( tPrev, vUv, resolution.xy, normalize(vUv*2.-1.));
-  vec4 prev = myBlur( tPrev, vUv, 1./resolution.xy, vec2(1., 0.));
-  vec4 inp = texture2D( tInput, vUv /* / vec2(aspect, 1.) */ );
+  float prevFer = myBlur( tPrev, vUv, 1./resolution.xy, vec2(1., 0.));
+  float nextFer = texture2D( tInput, vUv /* / vec2(aspect, 1.) */ ).r;
 
-  return vec4(blendAdd(inp.rgb, prev.rgb, opacity), 1.);
+  float fer = blendAdd(nextFer, prevFer, opacity);
+  return vec4(vec3(fer), 1.);
 }

@@ -25,7 +25,7 @@ vec2 rotate(vec2 v, float a) {
 vec4 compute () {
   vec4 sPrevVel = texture2D( tPrev, vUv );
   vec4 sPos = texture2D( tPos, vUv );
-  vec2 velNoise = texture2D( tPos, vUv ).xy;
+  vec2 velNoise = texture2D( tVelNoise, vUv ).xy;
 
   vec2 prevVel = sPrevVel.xy;
   vec2 pos = sPos.xy;
@@ -49,10 +49,11 @@ vec4 compute () {
 
   vec2 vel = (nVel + velNoise.xy * uNoiseStr) * uSpeed;
   vel = rotate(vel, TURN_ANG * sign(fer1 - fer2));
-  // vec2 dir = uPointer - prevVel.xy;
-  // float dist = length(dir);
-  // float str = smoothstep(.5, .1, dist) * .005;
-  // vec2 vel = (prevVel + vel * .01).xy - normalize(dir) * str;
+
+  vec2 dir = uPointer - prevVel.xy;
+  float dist = length(dir);
+  float str = smoothstep(.5, .1, dist) * .005;
+  vel = vel - normalize(dir) * str;
 
   // pos = toRangeFract(vec2(-aspect, -1), vec2(aspect, 1), pos);
   return vec4(vel, 0., 1.);

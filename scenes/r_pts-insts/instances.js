@@ -8,6 +8,7 @@ import {
   ShaderMaterial,
 } from 'three';
 
+import { GuiUniforms } from '/lib/gui';
 import fragGlsl from './points.frag.glsl?raw';
 import vertGlsl from './points.vert.glsl?raw';
 
@@ -18,13 +19,13 @@ export default function (countSq, tPos) {
     // defines: {
     //   // INSTANCED: '',
     // },
-    uniforms: {
-      time: { value: 0. },
-      pointSize: { value: 1. },
-      countSq: { value: countSq },
-      speed: { value: 1. },
-      tPos: { value: tPos },
-    },
+    uniforms: GuiUniforms('agents', {
+      uIntensity: [.2, 0.001, 2, .01],
+    }, {
+      pointSize: 1.,
+      countSq: countSq,
+      tPos: tPos,
+    }),
     vertexShader: vertGlsl,
     fragmentShader: fragGlsl,
     transparent: true,

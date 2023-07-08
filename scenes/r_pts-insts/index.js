@@ -2,6 +2,7 @@ import sketch, { debug } from '/lib/Sketch';
 
 import {
   WebGLRenderTarget,
+  RepeatWrapping,
   LinearFilter,
   NearestFilter,
   ShaderMaterial,
@@ -14,9 +15,10 @@ import {
   BoxGeometry,
   MeshBasicMaterial,
   Mesh,
+  OrthographicCamera,
 } from 'three';
 
-import { GuiUniforms } from '/lib/gui';
+import { gui, GuiUniforms } from '/lib/gui';
 import Feedback from '/lib/Feedback';
 import QuadFrame from '/lib/QuadFrame';
 import NoiseFrame from '/lib/NoiseFrame';
@@ -37,12 +39,11 @@ import createInstances from './instances.js';
 
 // const testTex = new TextureLoader().load('/assets/boxMap.jpg');
 
-const countSq = 200;
+const countSq = 400;
 
 const initVelFrame = new NoiseFrame({ name: 'initVel', size: countSq });
 initVelFrame.render();
-// debug(initVelFrame);
-const initPosFrame = new NoiseFrame({ name: 'initPos', size: countSq });
+const initPosFrame = new NoiseFrame({ name: 'initPos', size: countSq, range: [0, 1] });
 initPosFrame.render();
 
 const velNoiseFrame = new NoiseFrame({ name: 'velNoise', size: countSq,
@@ -69,7 +70,8 @@ const posFB = new Feedback({
     ${mathGlsl}
     vec4 compute () {
       vec2 pos = texture2D(tPrev, vUv).xy + texture2D(tVel, vUv).xy * uSpeed * SPEED;
-      pos = toRangeFract(vec2(-aspect, -1), vec2(aspect, 1), pos);
+      // pos = toRangeFract(vec2(-aspect, -1), vec2(aspect, 1), pos);
+      pos = fract(pos);
       return vec4(pos, .0, 1.);
     }`,
   }
@@ -84,12 +86,11 @@ const velFB = new Feedback({
   size: countSq,
   uniforms: GuiUniforms('velFB', {
     uSensorAng: [45, 0, 180, .5],
-    uSensorLod: [.01, 0, 1, .001],
-    uSensorDist: [0.005, -.1, .5, 0.001],
+    uSensorDist: [0.01, -.1, .5, 0.001],
     uSensorFerLimit: [1., 0, 5, .1],
-    uTurnAng: [45, 0, 180, .5],
+    uTurnAng: [20, 0, 180, .5],
     uSpeed: [2, 0, 10, .01],
-    uNoiseStr: [.1, 0, 1, .01],
+    uNoiseStr: [1, 0, 1, .01],
   }, {
     tPos: posFB.texture,
     tFer: null,
@@ -108,8 +109,8 @@ posFB.uniforms.tVel.value = velFB.texture;
 
 window.addEventListener('pointermove', e => {
   let { pageX: x, pageY: y } = e;
-  x = ((x / sketch.W) * 2 - 1);
-  y = (1 - (y / sketch.H)) * 2 - 1;
+  x = ((x / sketch.W));
+  y = (1 - (y / sketch.H));
   velFB.uniforms.uPointer.value = { x, y };
 });
 
@@ -118,6 +119,7 @@ function reset () {
   initVelFrame.quad.material.uniforms.seed.value = Math.random() * 1e3;
   initVelFrame.render();
   initPosFrame.render();
+  ferFB.reset();
   posFB.initWithTexture();
   velFB.initWithTexture();
 }
@@ -127,9 +129,9 @@ window.addEventListener('keydown', e => {
 });
 
 // INSTANCES
-const mesh = createInstances(countSq/*, posFB.texture*/);
-sketch.scene.add(mesh);
-sketch.scene.position.z = -2;
+const agents = createInstances(countSq, posFB.texture);
+sketch.scene.add(agents);
+sketch.camera = new OrthographicCamera(0, 1, 1, 0, 0, 50);
 
 const sceneFrame = new Frame({
   width: sketch.W, height: sketch.H,
@@ -139,9 +141,11 @@ const sceneFrame = new Frame({
 const ferFB = new Feedback({
   width: sketch.W / sketch.dpi,
   height: sketch.H / sketch.dpi,
+  wrap: RepeatWrapping,
   filter: LinearFilter,
   uniforms: GuiUniforms('ferFB', {
-    opacity: [.99, 0.9, 1., .001],
+    opacity: [.98, 0.9, 1., .001],
+    blur: [1.5, -1, 4.5, .01],
   }, {
     tInput: sceneFrame.texture,
   }),
@@ -156,7 +160,8 @@ sketch.addEventListener('resize', () => {
   sceneFrame.setSize(W, H);
   ferFB.setSize(W / sketch.dpi, H / sketch.dpi);
   posFB.uniforms.aspect.value = aspect;
-})
+});
+
 // posFB.uniforms.tFer.value = ferFB.texture;
 
 // const composer = new EffectComposer(sketch.renderer);
@@ -174,13 +179,16 @@ sketch.startRaf(({ now, elapsed, delta }) => {
 
   velFB.render();
 
-  mesh.material.uniforms.tPos.value = posFB.texture;
+  agents.material.uniforms.tPos.value = posFB.texture;
+  // agents.material.uniforms.tPos.value = velNoiseFrame.texture;
   sceneFrame.render(sketch);
   ferFB.render();
   velFB.uniforms.tFer.value = ferFB.texture;
-  // sketch.render();
+  sketch.render();
   // composer.render();
   debug(ferFB);
+  // debug(sceneFrame);
+  // debug(velFB);
   // debug(posFB);
   // console.timeEnd('sketch.render');
 });
