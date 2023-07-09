@@ -8,7 +8,7 @@ uniform float uTurnAng;
 uniform float uSpeed;
 uniform float uNoiseStr;
 
-uniform vec2 uPointer;
+uniform vec3 uPointer;
 uniform sampler2D tFer;
 uniform sampler2D tPos;
 uniform sampler2D tVelNoise;
@@ -50,10 +50,10 @@ vec4 compute () {
   vec2 vel = (nVel + velNoise.xy * uNoiseStr) * uSpeed;
   vel = rotate(vel, TURN_ANG * sign(fer1 - fer2));
 
-  vec2 dir = uPointer - prevVel.xy;
+  vec2 dir = (pos.xy - uPointer.xy) / vec2(1., aspect);
   float dist = length(dir);
-  float str = smoothstep(.5, .1, dist) * .005;
-  vel = vel - normalize(dir) * str;
+  float str = (1. - smoothstep(0., .3, dist)) * 2.;
+  vel = vel + normalize(dir) * str * (uPointer.z * 3. - 1.);
 
   // pos = toRangeFract(vec2(-aspect, -1), vec2(aspect, 1), pos);
   return vec4(vel, 0., 1.);
