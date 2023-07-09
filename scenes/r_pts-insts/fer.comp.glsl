@@ -1,6 +1,7 @@
 uniform float opacity;
 uniform float blur;
 uniform vec2 uPointer;
+uniform float uSensorFerLimit;
 
 vec4 blur5(sampler2D image, vec2 uv, vec2 resolution, vec2 direction) {
   vec4 color = vec4(0.0);
@@ -34,8 +35,11 @@ float blendAdd(float base, float blend, float opacity) {
   return (blendAdd(base, blend) * opacity + base * (1.0 - opacity));
 }
 
+// vec3 blendAdd(vec3 base, vec3 blend) {
+//   return min(base+blend,vec3(1.0));
+// }
 vec3 blendAdd(vec3 base, vec3 blend) {
-  return min(base+blend,vec3(1.0));
+  return base+blend;
 }
 vec3 blendAdd(vec3 base, vec3 blend, float opacity) {
   return (blendAdd(base, blend) * opacity + base * (1.0 - opacity));
@@ -43,11 +47,12 @@ vec3 blendAdd(vec3 base, vec3 blend, float opacity) {
 
 vec4 compute () {
   // prev = blur5( tPrev, vUv, resolution.xy, normalize(vUv*2.-1.));
-  float prevFer = myBlur( tPrev, vUv, 1./resolution.xy, vec2(1., 0.));
+  // float prevFer = myBlur( tPrev, vUv, 1./resolution.xy, vec2(1., 0.));
+  float prevFer = texture2D( tPrev, vUv).r;
   float nextFer = texture2D( tInput, vUv /* / vec2(aspect, 1.) */ ).r;
 
-  float fer = blendAdd(nextFer, prevFer, opacity);
+  float fer = clamp(0., blendAdd(nextFer, prevFer, opacity), uSensorFerLimit * 1.2);
   // vec2 pointer = uPointer * resolution;
-  // fer += (1. - smoothstep(3., 7., distance(gl_FragCoord.xy, pointer))) * -.2;
+  // fer = clamp(0., fer + (1. - smoothstep(3., 7., distance(gl_FragCoord.xy, pointer))) * .3, .99);
   return vec4(vec3(fer), 1.);
 }

@@ -6,9 +6,11 @@ uniform float uSensorAng;
 uniform float uSensorLod;
 uniform float uSensorDist;
 uniform float uSensorFerLimit;
-uniform float uTurnAng;
+uniform float uMaxTurnAng;
 uniform float uSpeed;
 uniform float uNoiseStr;
+
+uniform bool uInteractive;
 
 uniform vec3 uPointer;
 uniform sampler2D tFer;
@@ -36,7 +38,7 @@ vec4 compute () {
   float fer = sFer.r;
 
   float SENSOR_ANG = uSensorAng * PI / 180.;
-  float TURN_ANG = uTurnAng * PI / 180.;
+  float TURN_ANG = uMaxTurnAng * PI / 180.;
   float SENSOR_LOD = uSensorLod;
   // vec2 FIELD_SIZE = uTD2DInfos[siFer].res.zw;
   vec2 FIELD_ASP = vec2(1. / aspect, 1.);
@@ -45,21 +47,24 @@ vec4 compute () {
   vec2 sensDir1 = rotate(nVel * uSensorDist, SENSOR_ANG);
   vec2 sensDir2 = rotate(nVel * uSensorDist, -SENSOR_ANG);
   float sFer1 = texture2D(tFer, ((pos + 1.)/2. + sensDir1) * FIELD_ASP).r;
-  float fer1 = sFer1 > uSensorFerLimit ? sFer1 * -1. : sFer1;
+  float fer1 = sFer1 * 1.2 > uSensorFerLimit ? sFer1 * -1. : sFer1;
   float sFer2 = texture2D(tFer, ((pos + 1.)/2. + sensDir2) * FIELD_ASP).r;
   float fer2 = sFer2 > uSensorFerLimit ? sFer2 * -1. : sFer2;
 
   vec2 vel = (nVel + velNoise.xy * uNoiseStr)/*  * uSpeed */;
   vel = rotate(vel, TURN_ANG * sign(fer1 - fer2) * 1.5);
 
-  float pointerDown = uPointer.z;
-  vec2 pointer = uPointer.xy * vec2(sceneRes.x/sceneRes.y, 1.);
-  vec2 dir = (pos.xy - pointer.xy);
-  float dist = length(dir);
-  float str = (1. - smoothstep(0., .3, dist)) * 2.;
-  vel = vel + normalize(dir) * str * pointerDown;
-
   vel = normalize(vel) * uSpeed;
+
+  if (uInteractive) {
+    float pointerDown = uPointer.z * 2. - 1.;
+    vec2 pointer = uPointer.xy * vec2(sceneRes.x/sceneRes.y, 1.);
+    vec2 dir = (pos.xy - pointer.xy);
+    float dist = length(dir);
+    float str = (1. - smoothstep(0.1, .3, pow(dist, 2.))) * 2.;
+
+    vel = vel + normalize(dir) * str * pointerDown * uSpeed / 3.;
+  }
 
   // pos = toRangeFract(vec2(-aspect, -1), vec2(aspect, 1), pos);
   return vec4(vel, 0., 1.);

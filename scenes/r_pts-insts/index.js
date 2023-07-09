@@ -47,6 +47,15 @@ let aspect = sketch.W / sketch.H;
 let pointer = { x: -10, y: -10, z: 0 };
 const countSq = 400;
 
+const actions = {
+  'reset (R)': reset,
+  'fullscreen (F)': () => sketch.setFullscreen(),
+  'hide panels (H)': () => sketch.hidePanels(),
+}
+gui.add(actions, 'reset (R)');
+gui.add(actions, 'fullscreen (F)');
+gui.add(actions, 'hide panels (H)');
+
 const initVelFrame = new NoiseFrame({ name: 'initVel', size: countSq, normalize: true });
 initVelFrame.render();
 const initPosFrame = new NoiseFrame({ name: 'initPos', size: countSq, range: new Vector2(0, aspect) });
@@ -63,8 +72,8 @@ const posFB = new Feedback({
   initTexture: initPosFrame.texture,
   size: countSq,
   uniforms: GuiUniforms('posFB', {
-    uSpeed: 1,
   }, {
+    uSpeed: 1,
     tVel: null,
     aspect,
   }),
@@ -91,12 +100,13 @@ const velFB = new Feedback({
   initTexture: initVelFrame.texture,
   size: countSq,
   uniforms: GuiUniforms('velFB', {
-    uSensorAng: [45, 0, 180, .5],
-    uSensorDist: [0.01, -.1, .5, 0.001],
+    uSensorAng: [45, 0.5, 179.5, .5],
+    uSensorDist: [0.01, -.1, .2, 0.001],
     uSensorFerLimit: [1., 0, 5, .1],
-    uTurnAng: [20, 0, 180, .5],
-    uSpeed: [2, 0, 10, .01],
-    uNoiseStr: [1, 0, 1, .01],
+    uMaxTurnAng: [20, 0, 180, .5],
+    uSpeed: [2, 0.001, 10, .001],
+    uNoiseStr: [.6, 0, 1, .01],
+    uInteractive: true,
   }, {
     tPos: posFB.texture,
     tFer: null,
@@ -133,6 +143,8 @@ function reset () {
 }
 window.addEventListener('keydown', e => {
   if (e.key === 'r') reset();
+  if (e.key === 'f') sketch.setFullscreen();
+  if (e.key === 'h') sketch.hidePanels();
   if (e.code === 'Space') pause = !pause;
 });
 // INSTANCES
@@ -153,55 +165,60 @@ const ferFB = new Feedback({
   filter: LinearFilter,
   uniforms: GuiUniforms('ferFB', {
     opacity: [.98, 0.9, 1., .001],
-    blur: [1.5, -1, 4.5, .01],
+    // blur: [0., 0., 2., .01],
   }, {
+    uSensorFerLimit: velFB.uniforms.uSensorFerLimit,
     tInput: sceneFrame.texture,
     uPointer: pointer,
-  }),
+  }).open(),
   shader: {
     compute: ferCompGlsl,
   }
 });
 
-const paletteQFrame = new QuadFrame({
-  name: 'paletteQFrame',
+
+const postFx = new QuadFrame({
+  name: 'postFx',
   type: HalfFloatType,
   material: new ShaderMaterial({
-    uniforms: GuiUniforms('Palette', {
+    uniforms: GuiUniforms('postFx', {
       use: false,
       uPalette: {
         value: palettes[0],
         opts: palettes.reduce((opts, p, i) => Object.assign(opts, { [`Palette ${i}`]: p }), {}),
       },
-      uAnimSpeed: 1.,
+      uAnimSpeed: [1., -2, 20, .01],
       uPow: [1., 0.1, 2, .001],
+      uMix: [.9, -1, 2, .01],
     }, {
       resolution: { value: { x: sketch.W, y: sketch.H } },
       tColor: { value: ferFB.texture },
       time: { value: 0 },
-    }),
+    }).open(),
     vertexShader: rawVertGlsl,
     fragmentShader: `
       precision highp float;
       uniform vec3 uPalette[4];
       uniform sampler2D tColor;
-      uniform float uAnimSpeed;
+      // uniform float uAnimSpeed;
       uniform float uPow;
       uniform float time;
+      uniform float uMix;
       varying vec2 vUv;
       ${ paletteGlsl }
       void main () {
         vec4 col = texture2D(tColor, vUv);
-        vec3 pCol = palette(pow(col.r, uPow) + time * uAnimSpeed, uPalette[0], uPalette[1], uPalette[2], uPalette[3]);
+        vec3 pCol = palette(pow(col.r, uPow) + time, uPalette[0], uPalette[1], uPalette[2], uPalette[3]);
         pCol = clamp(pCol, 0., 1.);
+        pCol = mix(col.rgb, pCol, uMix);
         gl_FragColor = vec4((pCol/* + col.rgb*/) / 2., 1.);
       }
     `,
   }),
 });
 
-// paletteQFrame.render();
-// debug(paletteQFrame);
+// postFx.render();
+// debug(postFx);
 // debugger;
 
 sketch.addEventListener('resize', () => {
@@ -238,10 +255,11 @@ sketch.startRaf(({ now, elapsed, delta }) => {
   ferFB.render();
   velFB.uniforms.tFer.value = ferFB.texture;
 
-  if (paletteQFrame.material.uniforms.use.value) {
-    paletteQFrame.material.uniforms.time.value = elapsed/20;
-    paletteQFrame.render();
-    debug(paletteQFrame);
+  if (postFx.material.uniforms.use.value) {
+    postFx.material.uniforms.time.value += delta/20
+      * postFx.material.uniforms.uAnimSpeed.value;
+    postFx.render();
+    debug(postFx);
   } else
     debug(ferFB);
   // sketch.render();

@@ -22,7 +22,7 @@ export default function (countSq, tPos, aspect) {
     uniforms: GuiUniforms('agents', {
       uIntensity: [.2, 0.001, 2, .01],
     }, {
-      pointSize: 2.,
+      pointSize: 1.5,
       countSq: countSq,
       tPos: tPos,
       aspect,
