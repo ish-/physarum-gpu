@@ -8,11 +8,11 @@ import {
   ShaderMaterial,
 } from 'three';
 
-import { GuiUniforms } from '/lib/gui';
+import { gui, GuiUniforms } from '/lib/gui';
 import fragGlsl from './points.frag.glsl?raw';
 import vertGlsl from './points.vert.glsl?raw';
 
-export default function (countSq, tPos) {
+export default function (countSq, tPos, aspect) {
   const count = countSq**2;
 
   const mat = new ShaderMaterial({
@@ -22,9 +22,10 @@ export default function (countSq, tPos) {
     uniforms: GuiUniforms('agents', {
       uIntensity: [.2, 0.001, 2, .01],
     }, {
-      pointSize: 1.,
+      pointSize: 2.,
       countSq: countSq,
       tPos: tPos,
+      aspect,
     }),
     vertexShader: vertGlsl,
     fragmentShader: fragGlsl,

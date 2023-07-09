@@ -23,8 +23,11 @@ float myBlur (sampler2D img, vec2 uv, vec2 pixel, vec2 direction) {
   return res / 5.;
 }
 
+// float blendAdd(float base, float blend) {
+//   return min(base+blend,1.0);
+// }
 float blendAdd(float base, float blend) {
-  return min(base+blend,1.0);
+  return base+blend;
 }
 
 float blendAdd(float base, float blend, float opacity) {
@@ -44,7 +47,7 @@ vec4 compute () {
   float nextFer = texture2D( tInput, vUv /* / vec2(aspect, 1.) */ ).r;
 
   float fer = blendAdd(nextFer, prevFer, opacity);
-  vec2 pointer = uPointer * resolution;
-  fer += (1. - smoothstep(3., 7., distance(gl_FragCoord.xy, pointer))) * -.2;
+  // vec2 pointer = uPointer * resolution;
+  // fer += (1. - smoothstep(3., 7., distance(gl_FragCoord.xy, pointer))) * -.2;
   return vec4(vec3(fer), 1.);
 }

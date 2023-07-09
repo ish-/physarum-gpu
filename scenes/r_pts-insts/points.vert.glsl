@@ -13,6 +13,7 @@ precision highp float;
 
 uniform float pointSize;
 uniform float countSq;
+uniform float aspect;
 uniform sampler2D tPos;
 
 attribute float instanceId;
@@ -24,9 +25,9 @@ void main () {
     mod(instanceId, countSq) / countSq,
     floor(instanceId / countSq) / countSq
   );
-  vec2 vel = texture2D(tPos, instUv).xy;
+  vec2 pos = texture2D(tPos, instUv).xy;
   // vec4 mvPos = modelViewMatrix * vec4(position, 1.);
-  vPos = vec3(vel, 0.);
+  vPos = vec3(pos / vec2(aspect, 1.), 0.);
   // vCamDist = distance(cameraPosition, mvPos);
 
   // gl_PointSize = 3. * sqrt(size / 2. - length(p));

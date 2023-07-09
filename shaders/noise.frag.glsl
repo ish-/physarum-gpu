@@ -25,6 +25,10 @@ void main() {
     diminish
   );
 
+  #ifdef NORMALIZE
+    noise = normalize(noise);
+  #endif
+
   #ifdef RANGING
     #ifdef INVLERP
       noise = invlerp(-1., 1., noise);

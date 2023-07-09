@@ -43,13 +43,13 @@ import { palettes, paletteGlsl } from '/lib/PaletteGlsl';
 import createInstances from './instances.js';
 
 // const testTex = new TextureLoader().load('/assets/boxMap.jpg');
-
+let aspect = sketch.W / sketch.H;
 let pointer = { x: -10, y: -10, z: 0 };
 const countSq = 400;
 
-const initVelFrame = new NoiseFrame({ name: 'initVel', size: countSq });
+const initVelFrame = new NoiseFrame({ name: 'initVel', size: countSq, normalize: true });
 initVelFrame.render();
-const initPosFrame = new NoiseFrame({ name: 'initPos', size: countSq, range: new Vector2(0, 1) });
+const initPosFrame = new NoiseFrame({ name: 'initPos', size: countSq, range: new Vector2(0, aspect) });
 initPosFrame.render();
 
 const velNoiseFrame = new NoiseFrame({ name: 'velNoise', size: countSq,
@@ -66,7 +66,7 @@ const posFB = new Feedback({
     uSpeed: 1,
   }, {
     tVel: null,
-    aspect: sketch.W / sketch.H,
+    aspect,
   }),
   shader: {
     compute: `
@@ -76,8 +76,8 @@ const posFB = new Feedback({
     ${mathGlsl}
     vec4 compute () {
       vec2 pos = texture2D(tPrev, vUv).xy + texture2D(tVel, vUv).xy * uSpeed * SPEED;
-      // pos = toRangeFract(vec2(-aspect, -1), vec2(aspect, 1), pos);
-      pos = fract(pos);
+      pos = toRangeFract(vec2(-aspect, -1), vec2(aspect, 1), pos);
+
       return vec4(pos, .0, 1.);
     }`,
   }
@@ -101,8 +101,9 @@ const velFB = new Feedback({
     tPos: posFB.texture,
     tFer: null,
     tVelNoise: velNoiseFrame.texture,
+    sceneRes: sketch.size,
 
-    aspect: sketch.W / sketch.H,
+    aspect,
     uPointer: pointer,
   }).open(),
   shader: {
@@ -134,13 +135,13 @@ window.addEventListener('keydown', e => {
   if (e.key === 'r') reset();
   if (e.code === 'Space') pause = !pause;
 });
-
 // INSTANCES
-const agents = createInstances(countSq, posFB.texture);
+const agents = createInstances(countSq, posFB.texture, aspect);
 sketch.scene.add(agents);
 sketch.camera = new OrthographicCamera(0, 1, 1, 0, 0, 50);
 
 const sceneFrame = new Frame({
+  name: 'sceneFrame',
   // width: sketch.W, height: sketch.H,
   type: HalfFloatType,
 });
@@ -163,6 +164,7 @@ const ferFB = new Feedback({
 });
 
 const paletteQFrame = new QuadFrame({
+  name: 'paletteQFrame',
   type: HalfFloatType,
   material: new ShaderMaterial({
     uniforms: GuiUniforms('Palette', {
@@ -204,10 +206,13 @@ const paletteQFrame = new QuadFrame({
 
 sketch.addEventListener('resize', () => {
   const { W, H } = sketch;
-  const aspect = W / H;
-  sceneFrame.setSize(W, H);
+  aspect = W / H;
+  // sceneFrame.setSize(W, H);
+  initPosFrame.material.uniforms.range.y = aspect;
   ferFB.setSize(W, H);
+  velFB.uniforms.aspect.value = aspect
   posFB.uniforms.aspect.value = aspect;
+  agents.material.uniforms.aspect.value = aspect;
 });
 
 // posFB.uniforms.tFer.value = ferFB.texture;
