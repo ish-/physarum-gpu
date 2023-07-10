@@ -1,27 +1,23 @@
-import { $, $$, createEl, Arr, rand, px, map } from '/lib/utils';
+import { $, $$, createEl, Arr, rand, px, map, debounce } from '/lib/utils';
 import './BlockList.pcss';
 
 const { innerWidth: W, innerHeight: H,
   document,
   IntersectionObserver,
+  Map,
 } = window;
-
-
-const $doc = document.documentElement;
 const $root = document.body;
 
-
-const blocks = [];
+// export const blocks = new Map();
+export const blocks = new Set();
 const observer = new IntersectionObserver(onObserve, {});
 function onObserve (entries) {
   entries.forEach(entry => {
-    if (!entry.isIntersecting) {
-      const i = blocks.indexOf(entry.target);
-      if (~i) blocks.splice(i, 1);
-      return;
-    }
+    const { target: $el } = entry;
+    if (!entry.isIntersecting)
+      return blocks.delete($el);
 
-    blocks.push(entry.target);
+    blocks.add($el);
   });
 }
 
@@ -45,4 +41,11 @@ const $cont = createEl({ className: 'BlockList' },
 
 $root.append($cont);
 
-export default blocks;
+export let scroll = $cont.scrollTop;
+$cont.addEventListener('scroll', e => {
+  const { scrollTop } = $cont;
+  const delta = scrollTop - scroll;
+  scroll = scrollTop;
+});
+
+export const initBlockDim = [-9999,-9999,0,0];

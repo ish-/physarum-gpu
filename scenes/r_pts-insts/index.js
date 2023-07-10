@@ -10,6 +10,7 @@ import {
   InstancedBufferAttribute,
   Scene,
   Vector2,
+  Vector4,
   FloatType,
   HalfFloatType,
   Color,
@@ -37,16 +38,20 @@ import mathGlsl from '/shaders/math.glsl?raw';
 import velCompGlsl from './vel.comp.glsl?raw';
 import ferCompGlsl from './fer.Comp.glsl?raw';
 import rawVertGlsl from '/shaders/raw.vert.glsl?raw';
-import { insertAfter } from '/lib/utils';
+import { insertAfter, Arr } from '/lib/utils';
 import { palettes, paletteGlsl } from '/lib/PaletteGlsl';
 
 import createInstances from './instances.js';
 // import { $video, videoTexture } from './cameraMedia';
 // import edgeGlsl from '/shaders/edge.glsl';
-import blocks from './blocks';
+import { blocks, scroll, initBlockDim } from './blocks';
 import blocksGlsl from './blocks.glsl';
 
 // const testTex = new TextureLoader().load('/assets/boxMap.jpg');
+Object.assign(sketch.renderer.domElement.style, {
+  position: 'absolute',
+  zIndex: -1,
+});
 let aspect = sketch.W / sketch.H;
 let pointer = { x: -10, y: -10, z: 0 };
 const countSq = parseInt(window.location.hash.split('#')?.[1]) || 200;
@@ -179,7 +184,7 @@ const sceneFrame = new Frame({
 const ferFB = new Feedback({
   width: sketch.W / sketch.dpi,
   height: sketch.H / sketch.dpi,
-  wrap: RepeatWrapping,
+  // wrap: RepeatWrapping,
   filter: LinearFilter,
   uniforms: GuiUniforms('ferFB', {
     opacity: [.98, 0.9, 1., .001],
@@ -189,6 +194,7 @@ const ferFB = new Feedback({
     uSensorFerLimit: velFB.uniforms.uSensorFerLimit,
     tInput: sceneFrame.texture,
     uPointer: pointer,
+    uBlocks: { value: Arr(20).map(_ => new Vector4(...initBlockDim)) },
   }).open(),
   shader: {
     compute: blocksGlsl + /*edgeGlsl + */ferCompGlsl,
@@ -284,12 +290,27 @@ sketch.startRaf(({ now, elapsed, delta }) => {
     debug(postFx);
   } else
     debug(ferFB);
+
   // sketch.render();
   // composer.render();
   // debug(sceneFrame);
   // debug(velFB);
   // debug(posFB);
   // console.timeEnd('sketch.render');
+    handleBlocks();
 });
+
+function handleBlocks () {
+  let i = 0;
+  for (let $el of blocks) {
+    const dim = $el.getBoundingClientRect();
+    const hw = dim.width/2;
+    const hh = dim.height/2;
+    ferFB.uniforms.uBlocks.value[i].set(dim.x + hw, dim.y + hh, hw, hh).divideScalar(sketch.dpi);
+    i++;
+  }
+  for (; i < 20; i++)
+    ferFB.uniforms.uBlocks.value[i].set(...initBlockDim);
+}
 
 export default {};

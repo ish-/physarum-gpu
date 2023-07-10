@@ -1,3 +1,5 @@
+uniform vec4[20] uBlocks;
+
 vec2 translate(vec2 samplePosition, vec2 offset){
     return samplePosition - offset;
 }
