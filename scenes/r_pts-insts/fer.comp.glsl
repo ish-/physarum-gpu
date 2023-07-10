@@ -2,6 +2,7 @@ uniform float opacity;
 uniform float blur;
 uniform vec2 uPointer;
 uniform float uSensorFerLimit;
+// uniform sampler2D tVideo;
 
 vec4 blur5(sampler2D image, vec2 uv, vec2 resolution, vec2 direction) {
   vec4 color = vec4(0.0);
@@ -46,12 +47,17 @@ vec3 blendAdd(vec3 base, vec3 blend, float opacity) {
 }
 
 vec4 compute () {
+  vec2 toAspect = vec2(aspect, 1.);
   // prev = blur5( tPrev, vUv, resolution.xy, normalize(vUv*2.-1.));
   // float prevFer = myBlur( tPrev, vUv, 1./resolution.xy, vec2(1., 0.));
   float prevFer = texture2D( tPrev, vUv).r;
   float nextFer = texture2D( tInput, vUv /* / vec2(aspect, 1.) */ ).r;
+  // vec3 video = texture2D (tVideo, vUv).rgb;
+  // vec3 video = 1. - edge(tVideo, vUv, resolution).rgb;
 
   float fer = clamp(0., blendAdd(nextFer, prevFer, opacity), uSensorFerLimit * 1.2);
+
+  fer = fer + (sdBox(translate(vUv, uPointer)*toAspect, vec2(.1, .1)) < 0. ? 2. : 0.);
   // vec2 pointer = uPointer * resolution;
   // fer = clamp(0., fer + (1. - smoothstep(3., 7., distance(gl_FragCoord.xy, pointer))) * .3, .99);
   return vec4(vec3(fer), 1.);

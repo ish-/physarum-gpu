@@ -41,11 +41,15 @@ import { insertAfter } from '/lib/utils';
 import { palettes, paletteGlsl } from '/lib/PaletteGlsl';
 
 import createInstances from './instances.js';
+// import { $video, videoTexture } from './cameraMedia';
+// import edgeGlsl from '/shaders/edge.glsl';
+import blocks from './blocks';
+import blocksGlsl from './blocks.glsl';
 
 // const testTex = new TextureLoader().load('/assets/boxMap.jpg');
 let aspect = sketch.W / sketch.H;
 let pointer = { x: -10, y: -10, z: 0 };
-const countSq = 400;
+const countSq = parseInt(window.location.hash.split('#')?.[1]) || 200;
 
 const actions = {
   'reset (R)': reset,
@@ -56,10 +60,26 @@ gui.add(actions, 'reset (R)');
 gui.add(actions, 'fullscreen (F)');
 gui.add(actions, 'hide panels (H)');
 
-const initVelFrame = new NoiseFrame({ name: 'initVel', size: countSq, normalize: true });
-initVelFrame.render();
-const initPosFrame = new NoiseFrame({ name: 'initPos', size: countSq, range: new Vector2(0, aspect) });
-initPosFrame.render();
+const initVelFrame = new NoiseFrame({ name: 'initVel', size: countSq, normalize: true })
+  .render();
+const initPosFrame = new NoiseFrame({
+  name: 'initPos', size: countSq,
+  range: new Vector2(0, aspect)
+}).render();
+
+// const initVelFrame = new QuadFrame({
+//   name: 'initVelFrame',
+//   material: new ShaderMaterial({
+//     uniforms: {
+//       resolution: { value: sketch.size },
+//     },
+//     vertexShader: rawVertGlsl,
+//     fragmentShader: `
+//       varying vec2 vUv;
+//       void main () { gl_FragColor = vec4(vUv, 0., 1.); }
+//     `,
+//   }),
+// }).render();
 
 const velNoiseFrame = new NoiseFrame({ name: 'velNoise', size: countSq,
   uniforms: { speed: .16, lacunarity: 0.82 },
@@ -85,16 +105,14 @@ const posFB = new Feedback({
     ${mathGlsl}
     vec4 compute () {
       vec2 pos = texture2D(tPrev, vUv).xy + texture2D(tVel, vUv).xy * uSpeed * SPEED;
-      pos = toRangeFract(vec2(-aspect, -1), vec2(aspect, 1), pos);
+      pos = toRangeFract(vec2(0., 0.), vec2(aspect, 1), pos);
 
       return vec4(pos, .0, 1.);
     }`,
   }
 });
 
-// debug(posFB.textureOld)
-// debug(initVelFrame)
-// debugger;
+
 
 const velFB = new Feedback({
   initTexture: initVelFrame.texture,
@@ -102,7 +120,7 @@ const velFB = new Feedback({
   uniforms: GuiUniforms('velFB', {
     uSensorAng: [45, 0.5, 179.5, .5],
     uSensorDist: [0.01, -.1, .2, 0.001],
-    uSensorFerLimit: [1., 0, 5, .1],
+    uSensorFerLimit: [1., 0, 5, .001],
     uMaxTurnAng: [20, 0, 180, .5],
     uSpeed: [2, 0.001, 10, .001],
     uNoiseStr: [.6, 0, 1, .01],
@@ -155,7 +173,7 @@ sketch.camera = new OrthographicCamera(0, 1, 1, 0, 0, 50);
 const sceneFrame = new Frame({
   name: 'sceneFrame',
   // width: sketch.W, height: sketch.H,
-  type: HalfFloatType,
+  type: sketch.computeTextureType,
 });
 
 const ferFB = new Feedback({
@@ -167,19 +185,20 @@ const ferFB = new Feedback({
     opacity: [.98, 0.9, 1., .001],
     // blur: [0., 0., 2., .01],
   }, {
+    // tVideo: videoTexture,
     uSensorFerLimit: velFB.uniforms.uSensorFerLimit,
     tInput: sceneFrame.texture,
     uPointer: pointer,
   }).open(),
   shader: {
-    compute: ferCompGlsl,
+    compute: blocksGlsl + /*edgeGlsl + */ferCompGlsl,
   }
 });
 
 
 const postFx = new QuadFrame({
   name: 'postFx',
-  type: HalfFloatType,
+  type: FloatType,
   material: new ShaderMaterial({
     uniforms: GuiUniforms('postFx', {
       use: false,
@@ -244,16 +263,19 @@ sketch.startRaf(({ now, elapsed, delta }) => {
   // console.time('sketch.render');
   velNoiseFrame.material.uniforms.time.value = elapsed/2;
   velNoiseFrame.render();
-  posFB.render();
-  velFB.uniforms.tPos.value = posFB.texture;
 
-  velFB.render();
+  for (let i = 0; i < 3; i++) {
+    posFB.render();
+    velFB.uniforms.tPos.value = posFB.texture;
 
-  agents.material.uniforms.tPos.value = posFB.texture;
-  // agents.material.uniforms.tPos.value = velNoiseFrame.texture;
-  sceneFrame.render(sketch);
-  ferFB.render();
-  velFB.uniforms.tFer.value = ferFB.texture;
+    velFB.render();
+
+    agents.material.uniforms.tPos.value = posFB.texture;
+    // agents.material.uniforms.tPos.value = velNoiseFrame.texture;
+    sceneFrame.render(sketch);
+    ferFB.render();
+    velFB.uniforms.tFer.value = ferFB.texture;
+  }
 
   if (postFx.material.uniforms.use.value) {
     postFx.material.uniforms.time.value += delta/20

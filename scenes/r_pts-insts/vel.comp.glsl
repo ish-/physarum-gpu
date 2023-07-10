@@ -46,22 +46,23 @@ vec4 compute () {
   vec2 nVel = normalize(prevVel.xy);
   vec2 sensDir1 = rotate(nVel * uSensorDist, SENSOR_ANG);
   vec2 sensDir2 = rotate(nVel * uSensorDist, -SENSOR_ANG);
-  float sFer1 = texture2D(tFer, ((pos + 1.)/2. + sensDir1) * FIELD_ASP).r;
-  float fer1 = sFer1 * 1.2 > uSensorFerLimit ? sFer1 * -1. : sFer1;
-  float sFer2 = texture2D(tFer, ((pos + 1.)/2. + sensDir2) * FIELD_ASP).r;
+  float sFer1 = texture2D(tFer, (pos * FIELD_ASP + sensDir1)).r;
+  float fer1 = sFer1 > uSensorFerLimit ? sFer1 * -1. : sFer1;
+  float sFer2 = texture2D(tFer, (pos * FIELD_ASP + sensDir2)).r;
   float fer2 = sFer2 > uSensorFerLimit ? sFer2 * -1. : sFer2;
 
   vec2 vel = (nVel + velNoise.xy * uNoiseStr)/*  * uSpeed */;
   vel = rotate(vel, TURN_ANG * sign(fer1 - fer2) * 1.5);
 
-  vel = normalize(vel) * uSpeed;
+  // vel = normalize(vel) * uSpeed;
+  vel = vel * uSpeed;
 
   if (uInteractive) {
     float pointerDown = uPointer.z * 2. - 1.;
     vec2 pointer = uPointer.xy * vec2(sceneRes.x/sceneRes.y, 1.);
     vec2 dir = (pos.xy - pointer.xy);
     float dist = length(dir);
-    float str = (1. - smoothstep(0.1, .3, pow(dist, 2.))) * 2.;
+    float str = (1. - smoothstep(0.03, .1 + .2 * uPointer.z, pow(dist, 2.))) * 2.;
 
     vel = vel + normalize(dir) * str * pointerDown * uSpeed / 3.;
   }
