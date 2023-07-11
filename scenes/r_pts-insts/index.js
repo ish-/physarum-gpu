@@ -39,12 +39,13 @@ import velCompGlsl from './vel.comp.glsl?raw';
 import ferCompGlsl from './fer.Comp.glsl?raw';
 import rawVertGlsl from '/shaders/raw.vert.glsl?raw';
 import { insertAfter, Arr } from '/lib/utils';
+import { touchable, onTouchStart, onTouchEnd, onTouchMove } from '/lib/utils';
 import { palettes, paletteGlsl } from '/lib/PaletteGlsl';
 
 import createInstances from './instances.js';
 // import { $video, videoTexture } from './cameraMedia';
 // import edgeGlsl from '/shaders/edge.glsl';
-import { blocks, scroll, initBlockDim } from './blocks';
+import { blocks, scroll, initBlockDim, MAX_BLOCKS } from './blocks';
 import blocksGlsl from './blocks.glsl';
 
 // const testTex = new TextureLoader().load('/assets/boxMap.jpg');
@@ -54,16 +55,23 @@ Object.assign(sketch.renderer.domElement.style, {
 });
 let aspect = sketch.W / sketch.H;
 let pointer = { x: -10, y: -10, z: 0 };
-const countSq = parseInt(window.location.hash.split('#')?.[1]) || 200;
+const DEFAULT_COUNT_SQ = touchable ? 80 : 200;
+const countSq = parseInt(window.location.search.split('?')?.[1]) || DEFAULT_COUNT_SQ;
 
 const actions = {
   'reset (R)': reset,
   'fullscreen (F)': () => sketch.setFullscreen(),
   'hide panels (H)': () => sketch.hidePanels(),
 }
+const params = {
+  showBlocks: true,
+  blocksBlur: 0,
+};
 gui.add(actions, 'reset (R)');
 gui.add(actions, 'fullscreen (F)');
 gui.add(actions, 'hide panels (H)');
+gui.add(params, 'showBlocks').onChange(v => {blocks.setActive(v)});
+gui.add(params, 'blocksBlur', 0, 10, 1).onChange(v => {blocks.setBlur(v)});
 
 const initVelFrame = new NoiseFrame({ name: 'initVel', size: countSq, normalize: true })
   .render();
@@ -94,6 +102,7 @@ velNoiseFrame.render();
 // POS
 
 const posFB = new Feedback({
+  name: 'posFB',
   initTexture: initPosFrame.texture,
   size: countSq,
   uniforms: GuiUniforms('posFB', {
@@ -120,15 +129,17 @@ const posFB = new Feedback({
 
 
 const velFB = new Feedback({
+  name: 'velFB',
   initTexture: initVelFrame.texture,
   size: countSq,
   uniforms: GuiUniforms('velFB', {
     uSensorAng: [45, 0.5, 179.5, .5],
     uSensorDist: [0.01, -.1, .2, 0.001],
     uSensorFerLimit: [1., 0, 5, .001],
-    uMaxTurnAng: [20, 0, 180, .5],
+    uMaxTurnAng: [8, 0, 180, .5],
     uSpeed: [2, 0.001, 10, .001],
-    uNoiseStr: [.6, 0, 1, .01],
+    uNoiseStr: [1, 0, 10, .01],
+    computeIters: [3, 1, 10, 1],
     uInteractive: true,
   }, {
     tPos: posFB.texture,
@@ -147,13 +158,17 @@ const velFB = new Feedback({
 
 posFB.uniforms.tVel.value = velFB.texture;
 
-window.addEventListener('pointerdown', e => pointer.z = 1);
-window.addEventListener('pointerup', e => pointer.z = 0);
-window.addEventListener('pointermove', e => {
+const canvas = sketch.renderer.domElement;
+let touchDown = 0;
+onTouchStart(window/*canvas*/, e => handleTouch(e, touchDown = 1));
+onTouchEnd(window/*canvas*/, e => handleTouch(e, touchDown = 0));
+onTouchMove(window/*canvas*/, handleTouch);
+function handleTouch (e, z = 1) {
   let { pageX: x, pageY: y } = e;
   pointer.x = ((x / sketch.W));
   pointer.y = (1 - (y / sketch.H));
-});
+  pointer.z = touchDown;
+}
 
 let pause = false;
 function reset () {
@@ -176,16 +191,19 @@ sketch.scene.add(agents);
 sketch.camera = new OrthographicCamera(0, 1, 1, 0, 0, 50);
 
 const sceneFrame = new Frame({
+  dpi: 1,
   name: 'sceneFrame',
   // width: sketch.W, height: sketch.H,
   type: sketch.computeTextureType,
 });
 
 const ferFB = new Feedback({
-  width: sketch.W / sketch.dpi,
-  height: sketch.H / sketch.dpi,
-  // wrap: RepeatWrapping,
+  name: 'ferFB',
+  // width: sketch.W / sketch.dpi,
+  // height: sketch.H / sketch.dpi,
+  wrap: RepeatWrapping,
   filter: LinearFilter,
+  defines: { MAX_BLOCKS },
   uniforms: GuiUniforms('ferFB', {
     opacity: [.98, 0.9, 1., .001],
     // blur: [0., 0., 2., .01],
@@ -194,7 +212,7 @@ const ferFB = new Feedback({
     uSensorFerLimit: velFB.uniforms.uSensorFerLimit,
     tInput: sceneFrame.texture,
     uPointer: pointer,
-    uBlocks: { value: Arr(20).map(_ => new Vector4(...initBlockDim)) },
+    uBlocks: { value: Arr(MAX_BLOCKS).map(_ => new Vector4(...initBlockDim)) },
   }).open(),
   shader: {
     compute: blocksGlsl + /*edgeGlsl + */ferCompGlsl,
@@ -204,10 +222,11 @@ const ferFB = new Feedback({
 
 const postFx = new QuadFrame({
   name: 'postFx',
-  type: FloatType,
+  dpi: 1,
+  type: sketch.computeTextureType,
   material: new ShaderMaterial({
     uniforms: GuiUniforms('postFx', {
-      use: false,
+      usePalette: false,
       uPalette: {
         value: palettes[0],
         opts: palettes.reduce((opts, p, i) => Object.assign(opts, { [`Palette ${i}`]: p }), {}),
@@ -216,13 +235,14 @@ const postFx = new QuadFrame({
       uPow: [1., 0.1, 2, .001],
       uMix: [.9, -1, 2, .01],
     }, {
-      resolution: { value: { x: sketch.W, y: sketch.H } },
-      tColor: { value: ferFB.texture },
-      time: { value: 0 },
+      resolution: { x: sketch.W, y: sketch.H },
+      tColor: ferFB.texture,
+      time: 0,
     }).open(),
     vertexShader: rawVertGlsl,
     fragmentShader: `
       precision highp float;
+      uniform bool usePalette;
       uniform vec3 uPalette[4];
       uniform sampler2D tColor;
       // uniform float uAnimSpeed;
@@ -233,10 +253,15 @@ const postFx = new QuadFrame({
       ${ paletteGlsl }
       void main () {
         vec4 col = texture2D(tColor, vUv);
-        vec3 pCol = palette(pow(col.r, uPow) + time, uPalette[0], uPalette[1], uPalette[2], uPalette[3]);
-        pCol = clamp(pCol, 0., 1.);
-        pCol = mix(col.rgb, pCol, uMix);
-        gl_FragColor = vec4((pCol/* + col.rgb*/) / 2., 1.);
+        vec3 fer = vec3(col.r);
+        if (usePalette) {
+          vec3 pCol = palette(pow(fer.r, uPow) + time, uPalette[0], uPalette[1], uPalette[2], uPalette[3]);
+          pCol = clamp(pCol, 0., 1.);
+          pCol = mix(fer.rgb, pCol, uMix);
+          gl_FragColor = vec4((pCol/* + fer.rgb*/) / 2., 1.);
+        }
+        else
+          gl_FragColor = vec4(fer, 1.);
       }
     `,
   }),
@@ -246,13 +271,12 @@ const postFx = new QuadFrame({
 // debug(postFx);
 // debugger;
 
-sketch.addEventListener('resize', () => {
-  const { W, H } = sketch;
-  aspect = W / H;
-  // sceneFrame.setSize(W, H);
+sketch.addEventListener('resize', ({ size: { width, height }, dpi }) => {
+  aspect = width / height;
+  // sceneFrame.setSize(width, H);
   initPosFrame.material.uniforms.range.y = aspect;
-  ferFB.setSize(W, H);
-  velFB.uniforms.aspect.value = aspect
+  ferFB.setSize(width, height);
+  velFB.uniforms.aspect.value = aspect;
   posFB.uniforms.aspect.value = aspect;
   agents.material.uniforms.aspect.value = aspect;
 });
@@ -270,7 +294,7 @@ sketch.startRaf(({ now, elapsed, delta }) => {
   velNoiseFrame.material.uniforms.time.value = elapsed/2;
   velNoiseFrame.render();
 
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < velFB.uniforms.computeIters.value; i++) {
     posFB.render();
     velFB.uniforms.tPos.value = posFB.texture;
 
@@ -283,13 +307,13 @@ sketch.startRaf(({ now, elapsed, delta }) => {
     velFB.uniforms.tFer.value = ferFB.texture;
   }
 
-  if (postFx.material.uniforms.use.value) {
+  if (postFx.material.uniforms.usePalette.value)
     postFx.material.uniforms.time.value += delta/20
       * postFx.material.uniforms.uAnimSpeed.value;
-    postFx.render();
-    debug(postFx);
-  } else
-    debug(ferFB);
+  postFx.render();
+  debug(postFx);
+  // } else
+  //   debug(ferFB);
 
   // sketch.render();
   // composer.render();
@@ -302,15 +326,18 @@ sketch.startRaf(({ now, elapsed, delta }) => {
 
 function handleBlocks () {
   let i = 0;
-  for (let $el of blocks) {
-    const dim = $el.getBoundingClientRect();
-    const hw = dim.width/2;
-    const hh = dim.height/2;
-    ferFB.uniforms.uBlocks.value[i].set(dim.x + hw, dim.y + hh, hw, hh).divideScalar(sketch.dpi);
-    i++;
+  if (blocks.needRead) {
+    for (let $el of blocks) {
+      const dim = $el.getBoundingClientRect();
+      const hw = dim.width/2;
+      const hh = dim.height/2;
+      ferFB.uniforms.uBlocks.value[i].set(dim.x + hw, dim.y + hh, hw, hh);
+      i++;
+    }
+    for (; i < MAX_BLOCKS; i++)
+      ferFB.uniforms.uBlocks.value[i].set(...initBlockDim);
+    blocks.needRead = false;
   }
-  for (; i < 20; i++)
-    ferFB.uniforms.uBlocks.value[i].set(...initBlockDim);
 }
 
 export default {};

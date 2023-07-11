@@ -46,9 +46,11 @@ vec4 compute () {
   vec2 nVel = normalize(prevVel.xy);
   vec2 sensDir1 = rotate(nVel * uSensorDist, SENSOR_ANG);
   vec2 sensDir2 = rotate(nVel * uSensorDist, -SENSOR_ANG);
-  float sFer1 = texture2D(tFer, (pos * FIELD_ASP + sensDir1)).r;
+  vec4 _sFer1 = texture2D(tFer, (pos * FIELD_ASP + sensDir1));
+  float sFer1 = _sFer1.r + _sFer1.g;
   float fer1 = sFer1 > uSensorFerLimit ? sFer1 * -1. : sFer1;
-  float sFer2 = texture2D(tFer, (pos * FIELD_ASP + sensDir2)).r;
+  vec4 _sFer2 = texture2D(tFer, (pos * FIELD_ASP + sensDir2));
+  float sFer2 = _sFer2.r + _sFer2.g;
   float fer2 = sFer2 > uSensorFerLimit ? sFer2 * -1. : sFer2;
 
   vec2 vel = (nVel + velNoise.xy * uNoiseStr)/*  * uSpeed */;

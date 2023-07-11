@@ -3,7 +3,10 @@
   "version": "0.0.1",
   "description": "",
   "main": "index.js",
-  "scripts": {},
+  "scripts": {
+    "start": "vite --host",
+    "build": "vite build"
+  },
   "author": "",
   "license": "ISC",
   "dependencies": {

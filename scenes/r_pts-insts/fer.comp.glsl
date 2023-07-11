@@ -70,8 +70,8 @@ vec4 compute () {
     boxes += box;
   }
 
-  fer = fer + /* mouse + */ boxes;
+  fer = fer /*+ mouse *//* + boxes */;
   // vec2 pointer = uPointer * resolution;
   // fer = clamp(0., fer + (1. - smoothstep(3., 7., distance(gl_FragCoord.xy, pointer))) * .3, .99);
-  return vec4(vec3(fer), 1.);
+  return vec4(fer, boxes, 0., 1.);
 }
