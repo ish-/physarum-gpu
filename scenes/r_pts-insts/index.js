@@ -21,7 +21,7 @@ import {
   RawShaderMaterial,
 } from 'three';
 
-import { gui, GuiUniforms } from '/lib/gui';
+import { gui, GuiUniforms, Presets, ctrlWidth, setSkipGui } from '/lib/gui';
 import Feedback from '/lib/Feedback';
 import QuadFrame from '/lib/QuadFrame';
 import NoiseFrame from '/lib/NoiseFrame';
@@ -58,21 +58,20 @@ let pointer = { x: -10, y: -10, z: 0 };
 const DEFAULT_COUNT_SQ = touchable ? 80 : 200;
 const countSq = parseInt(window.location.search.split('?')?.[1]) || DEFAULT_COUNT_SQ;
 
+Presets();
+sketch.initGui();
 const actions = {
-  'reset (R)': reset,
-  'fullscreen (F)': () => sketch.setFullscreen(),
-  'hide panels (H)': () => sketch.hidePanels(),
+  'reset state (R)': reset,
 }
 const params = {
   showBlocks: true,
   blocksBlur: 0,
 };
-gui.add(actions, 'reset (R)');
-gui.add(actions, 'fullscreen (F)');
-gui.add(actions, 'hide panels (H)');
-gui.add(params, 'showBlocks').onChange(v => {blocks.setActive(v)});
-gui.add(params, 'blocksBlur', 0, 10, 1).onChange(v => {blocks.setBlur(v)});
+ctrlWidth(30, gui.add(params, 'showBlocks').onChange(v => {blocks.setActive(v)}));
+ctrlWidth(70, gui.add(params, 'blocksBlur', 0, 10, 1).onChange(v => {blocks.setBlur(v)}));
+gui.add(actions, 'reset state (R)');
 
+setSkipGui(true);
 const initVelFrame = new NoiseFrame({ name: 'initVel', size: countSq, normalize: true })
   .render();
 const initPosFrame = new NoiseFrame({
@@ -127,7 +126,7 @@ const posFB = new Feedback({
 });
 
 
-
+setSkipGui(false);
 const velFB = new Feedback({
   name: 'velFB',
   initTexture: initVelFrame.texture,
@@ -334,8 +333,7 @@ function handleBlocks () {
       ferFB.uniforms.uBlocks.value[i].set(dim.x + hw, dim.y + hh, hw, hh);
       i++;
     }
-    for (; i < MAX_BLOCKS; i++)
-      ferFB.uniforms.uBlocks.value[i].set(...initBlockDim);
+    ferFB.uniforms.uBlocks.value[i].set(...initBlockDim);
     blocks.needRead = false;
   }
 }
