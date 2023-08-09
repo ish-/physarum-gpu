@@ -66,7 +66,7 @@ vec4 compute () {
     uvPos.x = 1. - uvPos.x;
     vec2 uvSize = dims.zw / resolution;
     // vec2 uvSize = vec2(.1, .1);
-    float box = sdBox(translate(vUv, 1. - uvPos)/* *toAspect */, uvSize) < 0. ? 2. : 0.;
+    float box = sdBox(translate(vUv, 1. - uvPos)/* *toAspect */, uvSize) < 0. ? 20. : 0.;
     boxes += box;
   }
 

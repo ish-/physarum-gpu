@@ -1,46 +1,23 @@
 import sketch, { debug } from '/lib/Sketch';
 
 import {
-  WebGLRenderTarget,
-  RepeatWrapping,
-  LinearFilter,
-  NearestFilter,
-  ShaderMaterial,
-  TextureLoader,
-  InstancedBufferAttribute,
-  Scene,
-  Vector2,
-  Vector4,
-  FloatType,
-  HalfFloatType,
-  Color,
-  BoxGeometry,
-  MeshBasicMaterial,
-  Mesh,
-  OrthographicCamera,
-  RawShaderMaterial,
-} from 'three';
+  RepeatWrapping, LinearFilter, ShaderMaterial,
+  Vector2, Vector4, OrthographicCamera } from 'three';
 
+import { Arr, lerp, rerange } from '/lib/utils';
 import { gui, GuiUniforms, Presets, ctrlWidth, setSkipGui } from '/lib/gui';
 import Feedback from '/lib/Feedback';
 import QuadFrame from '/lib/QuadFrame';
 import NoiseFrame from '/lib/NoiseFrame';
 import Frame from '/lib/Frame';
 
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
-import { AfterimagePass } from 'three/addons/postprocessing/AfterimagePass.js'
-
-import defaultUvVertGlsl from '/shaders/defaultUv.vert.glsl';
-import opacityFrag from '/shaders/opacity.frag.glsl?raw';
-import tmpFrag from './tmp.frag.glsl?raw';
 import mathGlsl from '/shaders/math.glsl?raw';
 import velCompGlsl from './vel.comp.glsl?raw';
 import ferCompGlsl from './fer.Comp.glsl?raw';
 import rawVertGlsl from '/shaders/raw.vert.glsl?raw';
-import { insertAfter, Arr } from '/lib/utils';
 import { touchable, onTouchStart, onTouchEnd, onTouchMove } from '/lib/utils';
 import { palettes, paletteGlsl } from '/lib/PaletteGlsl';
+import { MicAnalyzer } from '/lib/MicAnalyzer';
 
 import createInstances from './instances.js';
 // import { $video, videoTexture } from './cameraMedia';
@@ -48,29 +25,69 @@ import createInstances from './instances.js';
 import { blocks, scroll, initBlockDim, MAX_BLOCKS } from './blocks';
 import blocksGlsl from './blocks.glsl';
 
-// const testTex = new TextureLoader().load('/assets/boxMap.jpg');
+// INIT
 Object.assign(sketch.renderer.domElement.style, {
   position: 'absolute',
   zIndex: -1,
 });
 let aspect = sketch.W / sketch.H;
-let pointer = { x: -10, y: -10, z: 0 };
+
 const DEFAULT_COUNT_SQ = touchable ? 80 : 200;
+// countSq from url ?query
 const countSq = parseInt(window.location.search.split('?')?.[1]) || DEFAULT_COUNT_SQ;
 
 Presets();
-sketch.initGui();
-const actions = {
-  'reset state (R)': reset,
-}
+sketch
+  .initGui()
+  .initKeys()
+  .initPointer()
+  .initStats();
+
+// THIS CONTROLS
 const params = {
   showBlocks: true,
   blocksBlur: 0,
+  mic: false,
+  micVol: 0,
 };
 ctrlWidth(30, gui.add(params, 'showBlocks').onChange(v => {blocks.setActive(v)}));
 ctrlWidth(70, gui.add(params, 'blocksBlur', 0, 10, 1).onChange(v => {blocks.setBlur(v)}));
-gui.add(actions, 'reset state (R)');
 
+const modulation = {
+  micVol: 0,
+  micVolMin: .5,
+};
+
+let mic;
+const micBuf = Arr(20).map(_ => 1);
+function micOnRender ({ now }) {
+  let vol = mic.getVol(now)/* ** .5*/;
+  vol = lerp(modulation.micVol, vol, vol < modulation.micVol ? .07 : 1);
+  // modulation.micVol = vol;
+  micBuf[Math.floor((now * 100) % 20)] = vol;
+  const nextMicVolMin = Math.min(
+    micBuf.reduce((min, vol) => Math.min(min, vol), 1),
+    .5,
+  );
+  const micVolMin = lerp(modulation.micVolMin, nextMicVolMin, .1);
+  modulation.micVolMin = micVolMin;
+  modulation.micVol = rerange(micVolMin, 1, 0, 1, vol);
+}
+gui.add(params, 'mic').onChange(async v => {
+  if (v) {
+    mic = await new MicAnalyzer();
+    sketch.on('render', micOnRender);
+  } else {
+    sketch.off('render', micOnRender);
+    modulation.micVol = 0;
+  }
+});
+gui.add(modulation, 'micVol', 0, 1).listen();
+gui.add(modulation, 'micVolMin', 0, 1).listen();
+
+
+
+///////////// COMPONENTS
 setSkipGui(true);
 const initVelFrame = new NoiseFrame({ name: 'initVel', size: countSq, normalize: true })
   .render();
@@ -79,26 +96,10 @@ const initPosFrame = new NoiseFrame({
   range: new Vector2(0, aspect)
 }).render();
 
-// const initVelFrame = new QuadFrame({
-//   name: 'initVelFrame',
-//   material: new ShaderMaterial({
-//     uniforms: {
-//       resolution: { value: sketch.size },
-//     },
-//     vertexShader: rawVertGlsl,
-//     fragmentShader: `
-//       varying vec2 vUv;
-//       void main () { gl_FragColor = vec4(vUv, 0., 1.); }
-//     `,
-//   }),
-// }).render();
-
 const velNoiseFrame = new NoiseFrame({ name: 'velNoise', size: countSq,
   uniforms: { speed: .16, lacunarity: 0.82 },
 });
 velNoiseFrame.render();
-
-// POS
 
 const posFB = new Feedback({
   name: 'posFB',
@@ -125,7 +126,6 @@ const posFB = new Feedback({
   }
 });
 
-
 setSkipGui(false);
 const velFB = new Feedback({
   name: 'velFB',
@@ -147,7 +147,7 @@ const velFB = new Feedback({
     sceneRes: sketch.size,
 
     aspect,
-    uPointer: pointer,
+    uPointer: sketch.pointer,
   }).open(),
   shader: {
     // damping: false,
@@ -157,34 +157,8 @@ const velFB = new Feedback({
 
 posFB.uniforms.tVel.value = velFB.texture;
 
-const canvas = sketch.renderer.domElement;
-let touchDown = 0;
-onTouchStart(window/*canvas*/, e => handleTouch(e, touchDown = 1));
-onTouchEnd(window/*canvas*/, e => handleTouch(e, touchDown = 0));
-onTouchMove(window/*canvas*/, handleTouch);
-function handleTouch (e, z = 1) {
-  let { pageX: x, pageY: y } = e;
-  pointer.x = ((x / sketch.W));
-  pointer.y = (1 - (y / sketch.H));
-  pointer.z = touchDown;
-}
 
-let pause = false;
-function reset () {
-  initVelFrame.quad.material.uniforms.seed.value = Math.random() * 1e3;
-  initVelFrame.render();
-  initPosFrame.render();
-  posFB.initWithTexture();
-  velFB.initWithTexture();
-  ferFB.reset();
-}
-window.addEventListener('keydown', e => {
-  if (e.key === 'r') reset();
-  if (e.key === 'f') sketch.setFullscreen();
-  if (e.key === 'h') sketch.hidePanels();
-  if (e.code === 'Space') pause = !pause;
-});
-// INSTANCES
+
 const agents = createInstances(countSq, posFB.texture, aspect);
 sketch.scene.add(agents);
 sketch.camera = new OrthographicCamera(0, 1, 1, 0, 0, 50);
@@ -192,14 +166,11 @@ sketch.camera = new OrthographicCamera(0, 1, 1, 0, 0, 50);
 const sceneFrame = new Frame({
   dpi: 1,
   name: 'sceneFrame',
-  // width: sketch.W, height: sketch.H,
   type: sketch.computeTextureType,
 });
 
 const ferFB = new Feedback({
   name: 'ferFB',
-  // width: sketch.W / sketch.dpi,
-  // height: sketch.H / sketch.dpi,
   wrap: RepeatWrapping,
   filter: LinearFilter,
   defines: { MAX_BLOCKS },
@@ -210,7 +181,7 @@ const ferFB = new Feedback({
     // tVideo: videoTexture,
     uSensorFerLimit: velFB.uniforms.uSensorFerLimit,
     tInput: sceneFrame.texture,
-    uPointer: pointer,
+    uPointer: sketch.pointer,
     uBlocks: { value: Arr(MAX_BLOCKS).map(_ => new Vector4(...initBlockDim)) },
   }).open(),
   shader: {
@@ -225,9 +196,9 @@ const postFx = new QuadFrame({
   type: sketch.computeTextureType,
   material: new ShaderMaterial({
     uniforms: GuiUniforms('postFx', {
-      usePalette: false,
+      usePalette: true,
       uPalette: {
-        value: palettes[0],
+        value: palettes[1],
         opts: palettes.reduce((opts, p, i) => Object.assign(opts, { [`Palette ${i}`]: p }), {}),
       },
       uAnimSpeed: [1., -2, 20, .01],
@@ -266,11 +237,9 @@ const postFx = new QuadFrame({
   }),
 });
 
-// postFx.render();
-// debug(postFx);
-// debugger;
 
-sketch.addEventListener('resize', ({ size: { width, height }, dpi }) => {
+
+sketch.on('resize', ({ size: { width, height }, dpi }) => {
   aspect = width / height;
   // sceneFrame.setSize(width, H);
   initPosFrame.material.uniforms.range.y = aspect;
@@ -280,15 +249,18 @@ sketch.addEventListener('resize', ({ size: { width, height }, dpi }) => {
   agents.material.uniforms.aspect.value = aspect;
 });
 
+sketch.on('reset', function reset () {
+  initVelFrame.quad.material.uniforms.seed.value = Math.random() * 1e3;
+  initVelFrame.render();
+  initPosFrame.render();
+  posFB.initWithTexture();
+  velFB.initWithTexture();
+  ferFB.reset();
+});
+
 // posFB.uniforms.tFer.value = ferFB.texture;
 
-// const composer = new EffectComposer(sketch.renderer);
-// composer.addPass(new RenderPass(sketch.scene, sketch.camera));
-// composer.addPass(new AfterimagePass(.99));
-
-sketch.initStats();
 sketch.startRaf(({ now, elapsed, delta }) => {
-  if (pause) return;
   // console.time('sketch.render');
   velNoiseFrame.material.uniforms.time.value = elapsed/2;
   velNoiseFrame.render();
@@ -306,21 +278,18 @@ sketch.startRaf(({ now, elapsed, delta }) => {
     velFB.uniforms.tFer.value = ferFB.texture;
   }
 
+  if (modulation.micVol) {
+    posFB.uniforms.uSpeed.value = modulation.micVol * 4;
+    velFB.uniforms.uSensorFerLimit.value = 2 - modulation.micVol * 2;
+  }
+
   if (postFx.material.uniforms.usePalette.value)
-    postFx.material.uniforms.time.value += delta/20
+    postFx.material.uniforms.time.value += delta / 20
       * postFx.material.uniforms.uAnimSpeed.value;
   postFx.render();
   debug(postFx);
-  // } else
-  //   debug(ferFB);
 
-  // sketch.render();
-  // composer.render();
-  // debug(sceneFrame);
-  // debug(velFB);
-  // debug(posFB);
-  // console.timeEnd('sketch.render');
-    handleBlocks();
+  handleBlocks();
 });
 
 function handleBlocks () {
@@ -328,8 +297,8 @@ function handleBlocks () {
   if (blocks.needRead) {
     for (let $el of blocks) {
       const dim = $el.getBoundingClientRect();
-      const hw = dim.width/2;
-      const hh = dim.height/2;
+      const hw = dim.width / 2;
+      const hh = dim.height / 2;
       ferFB.uniforms.uBlocks.value[i].set(dim.x + hw, dim.y + hh, hw, hh);
       i++;
     }

@@ -15,8 +15,7 @@ LOREM += '\n\n' + LOREM + '\n\n' + LOREM;
 
 // export const blocks = new Map();
 export const blocks = new Set();
-const observer = new IntersectionObserver(onObserve, {});
-function onObserve (entries) {
+const observer = new IntersectionObserver(function onObserve (entries) {
   entries.forEach(entry => {
     const { target: $el } = entry;
     if (!entry.isIntersecting)
@@ -24,7 +23,8 @@ function onObserve (entries) {
 
     blocks.add($el);
   });
-}
+});
+
 
 blocks.needRead = true;
 blocks.active = true;
@@ -40,13 +40,14 @@ const $cont = createEl({ className: 'BlockList' },
     const top = i * 600 + rand.int(-150, 150);
     const left = Math.max(p, W / 4 + rand.int(-W / 3, W / 3));
     const width = rand.int(100, W - left - p);
-    const height = rand.int(30, H);
+    const height = rand.int(30, H / 2);
+    const startTextInx = rand.int(0, LOREM.length / 2);
 
     const $block = createEl({
       className: 'Block',
-      style: map({ top, left, width, height }, px),
+      style: map({ top, left, width/*, height*/ }, px),
     }, [
-      createEl({ textContent: LOREM.substr(rand.int(0, 15)) }),
+      createEl({ textContent: LOREM.substr(startTextInx, rand.int(40, 160)) }),
     ]);
 
     observer.observe($block);
