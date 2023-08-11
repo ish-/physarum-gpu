@@ -21,8 +21,8 @@ export default function (countSq, tPos, aspect) {
     // },
     uniforms: GuiUniforms('agents', {
       uIntensity: [.2, 0.001, 2, .01],
+      pointSize: [1.5, .1, 5],
     }, {
-      pointSize: 1.5,
       countSq: countSq,
       tPos: tPos,
       aspect,
@@ -32,26 +32,29 @@ export default function (countSq, tPos, aspect) {
     transparent: true,
     blending: NormalBlending,
     // // depthWrite: true,
-    // depthTest: false,
+    depthTest: false,
   });
 
   const geo = new BufferGeometry();
   // const center = [0, 1];
 
   const posAttr = new Float32Array(count * 3);
-  for (let k = 0; k < count; k += 3) {
-    const i = k * 3;
-    posAttr[i] = (Math.random()*2-1);
-    posAttr[i+1] = (Math.random()*2-1);
-    posAttr[i+2] = 0;
-  }
+  // for (let k = 0; k < count; k += 3) {
+  //   const i = k * 3;
+  //   posAttr[i] = (Math.random()*2-1);
+  //   posAttr[i+1] = (Math.random()*2-1);
+  //   posAttr[i+2] = 0;
+  // }
   geo.setAttribute('position', new BufferAttribute(posAttr, 3));
 
-
-  const inxAttr = new BufferAttribute(new Float32Array(count), 1);
-  for (let i = 0; i < count; i++)
-    inxAttr.array[i] = i;
-  geo.setAttribute('instanceId', inxAttr);
+  const gidAttr = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const ii = i * 3;
+    gidAttr[ii] = (i % countSq) / countSq;
+    gidAttr[ii+1] = Math.floor(i / countSq) / countSq;
+    gidAttr[ii+2] = i;
+  }
+  geo.setAttribute('gId', new BufferAttribute(gidAttr, 3));
 
   const mesh = new Points(geo, mat);
 

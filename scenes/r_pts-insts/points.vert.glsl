@@ -17,15 +17,12 @@ uniform float aspect;
 uniform sampler2D tPos;
 
 attribute float instanceId;
+attribute vec3 gId;
 
 varying vec3 vPos;
 
 void main () {
-  vec2 instUv = vec2(
-    mod(instanceId, countSq) / countSq,
-    floor(instanceId / countSq) / countSq
-  );
-  vec2 pos = texture2D(tPos, instUv).xy;
+  vec2 pos = texture2D(tPos, gId.xy).xy;
   // vec4 mvPos = modelViewMatrix * vec4(position, 1.);
   vPos = vec3(pos / vec2(aspect, 1.), 0.);
   // vCamDist = distance(cameraPosition, mvPos);

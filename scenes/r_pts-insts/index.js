@@ -59,7 +59,7 @@ const modulation = {
 };
 
 let mic;
-const micBuf = Arr(20).map(_ => 1);
+const micBuf = new Array(20).fill(1);
 function micOnRender ({ now }) {
   let vol = mic.getVol(now)/* ** .5*/;
   vol = lerp(modulation.micVol, vol, vol < modulation.micVol ? .07 : 1);
