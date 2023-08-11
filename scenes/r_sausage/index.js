@@ -1,6 +1,6 @@
-import sketch, { debug } from '/lib/Sketch';
+import sketch from '/lib/Sketch';
 
-import * as THREE from 'three'
+import { GUI } from 'lil-gui';
 import {
   CircleGeometry,
   BufferAttribute,
@@ -11,29 +11,49 @@ import {
   Mesh,
   InstancedMesh,
   OrthographicCamera,
+  MeshBasicMaterial,
+  DoubleSide,
+  BoxGeometry,
+  DynamicDrawUsage,
+  Object3D,
 } from 'three';
+import { insertAfter } from '/lib/utils';
 import { OrbitControls } from 'three/addons/controls/OrbitControls';
 
-import circlesData from './circles.json';
-const GRADIENT = [0x132251, 0x30537b];
+import QuadFrame from '/lib/QuadFrame';
+import defaultUvVertGlsl from '/shaders/defaultUv.vert.glsl?raw';
+
+import _circlesData from './circles.json';
+sketch.initKeys();
+const circlesData = _circlesData.reduce((m, d, i) => {
+  if (!(i % 2)) m.push(d);
+  return m;
+}, []);
+
 const COUNT = circlesData.length;
-const circleGeo = new CircleGeometry();
-// circleGeo.computeVertexNormals()
-// circleGeo.computeTangents()
+console.log({COUNT})
 
-// const geo = new InstancedBufferGeometry();
-// geo.setAttribute('position', new BufferAttribute(new Float32Array([
-//   0.025, - 0.025, 0,
-//   - 0.025, 0.025, 0,
-//   0, 0, 0.025,
-// ]), 3));
-// geo.attributes = circleGeo.attributes;
+const gui = new GUI({ title: 'Controls', closeFolders: true });
+const PARS = {
+  size: .4,
+  rotate: 0,
+};
+gui.add(PARS, 'size', .0001, 10, .001).listen()
+  .onChange(v => modifyTransforms(({ scale }) =>
+    scale.set(v, v, 1)));
+gui.add(PARS, 'rotate', 0, 360, .1).listen()
+  .onChange(v => {
+    const rad = v / Math.PI;
+    modifyTransforms(({ rotation }, i) =>
+      rotation.set(0, 0, i * rad / 1000))
+  });
 
+const circleGeo = new CircleGeometry(PARS.size, 48);
 const offsetAttr = new Float32Array(COUNT * 3);
 for (let k = 0; k < COUNT; k += 3) {
   const i = k * 3;
-  offsetAttr[i] = (Math.random()*2-1);
-  offsetAttr[i+1] = (Math.random()*2-1);
+  offsetAttr[i] = circlesData[k][0];
+  offsetAttr[i+1] = circlesData[k][1];
   offsetAttr[i+2] = 0;
 }
 // geo.setAttribute('offset', new InstancedBufferAttribute(offsetAttr, 3));
@@ -44,15 +64,46 @@ circleGeo.setAttribute('offset', new BufferAttribute(offsetAttr, 3));
 //   inxAttr.array[i] = i;
 // geo.setAttribute('instanceId', inxAttr);
 
-const mat = new THREE.MeshBasicMaterial({ color: 0xff6600, side: THREE.DoubleSide, });
-mat.onBeforeCompile(shader => {
+const albedo = new QuadFrame({
+  size: 500,
+  material: new ShaderMaterial({
+    uniforms: {},
+    fragmentShader: `
+      varying vec2 vUv;
+
+      void main() {
+        vec3 color = mix(
+          vec3(0.07450980392156863, 0.13333333333333333, 0.3176470588235294),
+          vec3(0.18823529411764706, 0.3254901960784314, 0.4823529411764706),
+          vUv.x
+        );
+        gl_FragColor = vec4(color, 1.);
+      }`,
+    vertexShader: defaultUvVertGlsl,
+  }),
+}).render();
+
+const mat = new MeshBasicMaterial({ side: DoubleSide,
+  map: albedo.texture });
+const matUTime = { value: 0 };
+mat.onBeforeCompile = shader => {
   console.log(shader);
-});
+  shader.uniforms.uTime = matUTime;
+  shader.vertexShader = 'varying float vInstanceZ;\n' +
+    insertAfter(shader.vertexShader, '#include <uv_vertex>', `
+      vInstanceZ = instanceMatrix[3][2];
+    `);
+  shader.fragmentShader = 'uniform float uTime; varying float vInstanceZ;' +
+    insertAfter(shader.fragmentShader, '#include <map_fragment>', `
+      float modu = uTime * 5. + vInstanceZ * 8.;
+      diffuseColor *= sin(min(1.5,max(-.5, (vInstanceZ + fract(-uTime/3.) *2.) *25. - 30. ))*3.1415)/2. + 1.5;
+    `);
+};
 // const mat = new RawShaderMaterial({
 //   uniforms: {
 //     time: { value: sketch.timeUniform },
 //   },
-//   side: THREE.DoubleSide,
+//   side: DoubleSide,
 //   vertexShader: `
 //     precision highp float;
 //     uniform mat4 projectionMatrix;
@@ -85,41 +136,64 @@ mat.onBeforeCompile(shader => {
 //   return shader;
 // })
 
-const testMesh = new THREE.Mesh(
-  new THREE.BoxGeometry(),
-  new THREE.MeshBasicMaterial({ color: 0xff6600, wireframe: true }),
-);
-// testMesh.rotation.x = 45;
-// testMesh.rotation.y = 45;
-const testMesh2 = testMesh.clone();
-testMesh2.scale.multiplyScalar(.5);
-sketch.scene.add(testMesh);
-sketch.scene.add(testMesh2);
+// const testMesh = new Mesh(
+//   new BoxGeometry(),
+//   new MeshBasicMaterial({ color: 0xff6600, wireframe: true }),
+// );
+// // testMesh.rotation.x = 45;
+// // testMesh.rotation.y = 45;
+// const testMesh2 = testMesh.clone();
+// testMesh2.scale.multiplyScalar(.5);
+// sketch.scene.add(testMesh);
+// sketch.scene.add(testMesh2);
 
 const mesh = new InstancedMesh(circleGeo, mat, COUNT);
-mesh.instanceMatrix.setUsage( THREE.DynamicDrawUsage );
+// mesh.instanceMatrix.setUsage( DynamicDrawUsage );
 
-const dummy = new THREE.Object3D();
-for (let i = 0; i < COUNT; i++) {
-  dummy.position.set(Math.random()*2-1, Math.random()*2-1,0);
-  dummy.updateMatrix();
-  mesh.setMatrixAt(i, dummy.matrix);
+const instanceIds = new BufferAttribute(new Float32Array(COUNT), 1);
+mesh.set
+
+const transforms = new Array(COUNT).fill(0).map((_, i) => new Object3D());
+modifyTransforms((t, i) => {
+  t.position.set(
+    circlesData[i][0] * .001,
+    circlesData[i][1] * .001,
+    1 - i / COUNT,
+  );
+})
+
+function modifyTransforms (fn) {
+  transforms.forEach((t, i) => {
+    fn(t, i);
+    t.updateMatrix();
+    // console.log(t.matrix);
+    // debugger;
+    mesh.setMatrixAt(i, t.matrix);
+  });
+  mesh.instanceMatrix.needsUpdate = true;
 }
-mesh.instanceMatrix.needsUpdate = true;
 
 sketch.scene.add(mesh);
 // const mesh = new Mesh(geo, mat);
 // sketch.scene.position.z = -4;
-// sketch.camera = new OrthographicCamera(-1, 1, 1, -1, .000001, 50);
-// sketch.camera.updateProjectionMatrix();
+sketch.camera = new OrthographicCamera(-1, 1, 1, -1, .000001, 50);
 sketch.camera.position.z = -2;
 
 const orbit = new OrbitControls(sketch.camera, sketch.renderer.domElement);
 orbit.listenToKeyEvents( window );
 
-debugger;
+function handleResize ({ size } = sketch) {
+  console.log('handleResize', size)
+  const aspect = size.x / size.y;
+  sketch.camera.right = aspect;
+  sketch.camera.left = -aspect;
+  sketch.camera.updateProjectionMatrix();
+}
+handleResize();
+sketch.on('resize', handleResize);
 
 sketch.initStats();
 sketch.startRaf(({ now, elapsed, delta }) => {
+  matUTime.value = elapsed;
   sketch.render();
 });
