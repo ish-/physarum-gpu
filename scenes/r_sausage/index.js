@@ -4,10 +4,7 @@ import { GUI } from 'lil-gui';
 import {
   CircleGeometry,
   BufferAttribute,
-  InstancedBufferGeometry,
-  InstancedBufferAttribute,
   ShaderMaterial,
-  RawShaderMaterial,
   Mesh,
   InstancedMesh,
   OrthographicCamera,
@@ -19,7 +16,7 @@ import {
   Vector3,
   Color,
 } from 'three';
-import { insertAfter, callnpass, rand } from '/lib/utils';
+import { insertAfter, callnpass, rand, toFixed } from '/lib/utils';
 import InstancingTransforms from '/lib/InstancingTransforms';
 import { OrbitControls } from 'three/addons/controls/OrbitControls';
 
@@ -35,19 +32,66 @@ const circlesData = _circlesData.reduce((m, d, i) => {
   return m;
 }, []);
 
-const gui = new GUI({ title: 'Controls', closeFolders: true });
+const gui = new GUI({ title: 'Adjust', closeFolders: true });
 const PARS = {
   size: 1,
-  rotate: 0,
+  rotateStep: 0,
+  rotateSpeed: 5,
   origin: true,
   colorStart: { value: new Color(0x112256) },
   colorStop: { value: new Color(0x24507a) },
+  pulseLerp: { value: 0 },
+  pulseWidth: { value: .3 },
+  pulseDuration: 2,
+  pulseInterval: 5,
+  pulseIntervalRand: 1,
+  pulse: () => {
+    PARS.pulseLerp.value = 0;
+    sketch.off('render', animatePulse);
+    sketch.on('render', animatePulse);
+  },
+  pulsePlay: true,
+  camRot: '',
+  camPos: '',
 };
 gui.add(PARS, 'origin').onChange(v => sketch.scene[v?'add':'remove'](testMesh));
+gui.add(PARS, 'size', .0001, 10, .001).onChange(setScale);
+gui.add(PARS, 'rotateStep', 0, 100, .1).onChange(setRotation);
+gui.add(PARS, 'rotateSpeed', 0, 50, .001).onChange(v => v === 0 && setRotation());
 gui.addColor(PARS.colorStart, 'value').name('colorStart')
   .onChange(v => albedo.render());
 gui.addColor(PARS.colorStop, 'value').name('colorStop')
   .onChange(v => albedo.render());
+gui.add(PARS.pulseLerp, 'value', 0, 1, .001).name('pulseLerp').listen();
+gui.add(PARS.pulseWidth, 'value', 0, 2, .001).name('pulseWidth').listen();
+gui.add(PARS, 'pulseDuration', 0.001, 10, .01);
+gui.add(PARS, 'pulse');
+gui.add(PARS, 'pulseInterval', 0.1, 30, .01).onChange(pulseInterval);
+gui.add(PARS, 'pulseIntervalRand', 0, 10, .1);
+gui.add(PARS, 'pulsePlay').onChange(v => v ? pulseInterval() : clearTimeout(pulseIi));
+function animatePulse ({ delta }) {
+  PARS.pulseLerp.value += delta / PARS.pulseDuration;
+  if (PARS.pulseLerp.value > 1.) {
+    sketch.off('render', animatePulse);
+    PARS.pulseLerp.value = 0;
+  }
+}
+gui.add(PARS, 'camRot').listen();
+gui.add(PARS, 'camPos').listen();
+
+let pulseIi;
+function pulseInterval (
+  time = PARS.pulseInterval + PARS.pulseDuration + rand(-1)*PARS.pulseIntervalRand
+) {
+  clearTimeout(pulseIi);
+
+  pulseIi = setTimeout(() => {
+    console.log('pulseInterval.pulse')
+    PARS.pulse();
+    pulseInterval();
+  }, time * 1e3);
+}
+pulseIi = pulseInterval();
 
 const COUNT = circlesData.length;
 console.log({COUNT})
@@ -60,13 +104,7 @@ for (let k = 0; k < COUNT; k += 3) {
   offsetAttr[i+1] = circlesData[k][1];
   offsetAttr[i+2] = 0;
 }
-// geo.setAttribute('offset', new InstancedBufferAttribute(offsetAttr, 3));
 circleGeo.setAttribute('offset', new BufferAttribute(offsetAttr, 3));
-
-// const inxAttr = new InstancedBufferAttribute(new Float32Array(COUNT), 1);
-// for (let i = 0; i < COUNT; i++)
-//   inxAttr.array[i] = i;
-// geo.setAttribute('instanceId', inxAttr);
 
 const albedo = new QuadFrame({
   type: sketch.computeTextureType,
@@ -97,14 +135,25 @@ const mat = new MeshBasicMaterial({ side: DoubleSide,
   map: albedo.texture });
 mat.onBeforeCompile = shader => {
   shader.uniforms.uTime = sketch.timeUniform;
+  shader.uniforms.pulseLerp = PARS.pulseLerp;
+  shader.uniforms.pulseWidth = PARS.pulseWidth;
+
   shader.vertexShader = 'varying float vInstanceZ;\n' +
     insertAfter(shader.vertexShader, '#include <uv_vertex>', `
       vInstanceZ = instanceMatrix[3][2];
     `);
-  shader.fragmentShader = 'uniform vec3 uTime; varying float vInstanceZ;' +
-    insertAfter(shader.fragmentShader, '#include <map_fragment>', `
-      float modu = uTime.x * 5. + vInstanceZ * 8.;
-      diffuseColor *= sin(min(1.5,max(-.5, (vInstanceZ + fract(-uTime.x/10.) *2.) *25. - 30. ))*3.1415)/2. + 1.5;
+  shader.fragmentShader = `
+      uniform vec3 uTime;
+      uniform float pulseWidth;
+      uniform float pulseLerp;
+      varying float vInstanceZ;
+    `
+    + insertAfter(shader.fragmentShader, '#include <map_fragment>', `
+      // diffuseColor *= sin(min(1.5,max(-.5, (vInstanceZ + (1. - pulseLerp) *2.) *25. - 30. ))*3.1415)/2. + 1.5;
+      float r = 1. / pulseWidth;
+      float lerp = (1. - pulseLerp);
+      lerp = lerp*(1.+r)-r + vInstanceZ*r;
+      diffuseColor *= 1. + smoothstep(0., .5, lerp) * smoothstep(1., .5, lerp) * 2.;
     `);
 };
 
@@ -123,21 +172,19 @@ transforms.forEach((t, i) => {
   );
 });
 
-gui.add(PARS, 'size', .0001, 10, .001).onChange(
-  callnpass(function setScale (v = PARS.size) {
-    transforms.forEach(({ scale }, i) => {
-      const s = v + (1 - i / COUNT) * .6 * v; // from ref
-      scale.set(s, s, 1);
-    })
-  }));
-
-
-gui.add(PARS, 'rotate', 0, 360, .1).onChange(
-  callnpass(function setRotation (v = PARS.rotate) {
-    const rad = v / Math.PI;
-    transforms.forEach(({ rotation }, i) => rotation.set(0, 0, i * rad / 1000));
+function setScale (v = PARS.size) {
+  transforms.forEach(({ scale }, i) => {
+    const s = v + (1 - i / COUNT) * .6 * v; // from ref
+    scale.set(s, s, 1);
   })
-);
+}
+setScale();
+function setRotation (v = PARS.rotateStep) {
+  const rad = v / Math.PI;
+  transforms.forEach(({ rotation }, i) => rotation.set(0, 0, i * rad / 1000));
+}
+setRotation()
+
 
 mesh.scale.multiplyScalar(1.4);
 mesh.position.set(1.8, 1, 0);
@@ -145,7 +192,7 @@ sketch.scene.add(mesh);
 // const mesh = new Mesh(geo, mat);
 sketch.scene.position.z = 2;
 const camera = sketch.camera = new OrthographicCamera(-1, 1, 1, -1, .000001, 50);
-// sketch.camera.position.z = -2;
+sketch.camera.position.z = -2;
 
 const testMesh = new Object3D();
 const testMesh1 = new Mesh(
@@ -169,18 +216,27 @@ sketch.on('resize', handleResize);
 
 sketch.initStats();
 
-const camVel = new Vector3();
-const origin = new Vector3(0, 0, 2);
-sketch.startRaf(({ now, elapsed, delta }) => {
-  transforms.forEach(t => t.rotation.z += .005);
+// const camVel = new Vector3();
+// const origin = new Vector3(0, 0, 2);
 
+sketch.startRaf(({ now, elapsed, delta }) => {
+  if (PARS.rotateSpeed !== 0)
+    transforms.forEach(t => t.rotation.z += PARS.rotateSpeed / 1e3);
+
+  // (() => {
+  //   const drv = .0001;
+  //   camVel.add({ x: rand(-drv,drv), y: rand(-drv,drv), z: 0 });
+  //   camVel.clampLength(0, .01);
+  //   camera.position.add(camVel);
+  //   camera.position.clampLength(0, .1);
+  //   camera.lookAt(origin);
+  // })()
   (() => {
-    const drv = .0001;
-    camVel.add({ x: rand(-drv,drv), y: rand(-drv,drv), z: 0 });
-    camVel.clampLength(0, .01);
-    camera.position.add(camVel);
-    camera.position.clampLength(0, .1);
-    camera.lookAt(origin);
+    const { camera: c } = sketch;
+    const r = c.rotation;
+    PARS.camRot = `${toFixed(r.x)},${toFixed(r.y)},${toFixed(r.z)}`;
+    const p = c.position;
+    PARS.camPos = `${toFixed(p.x)},${toFixed(p.y)},${toFixed(p.z)},${toFixed(c.zoom)}`;
   })()
 
   sketch.render();
