@@ -16,8 +16,10 @@ import {
   BoxGeometry,
   DynamicDrawUsage,
   Object3D,
+  Vector3,
+  Color,
 } from 'three';
-import { insertAfter, callnpass } from '/lib/utils';
+import { insertAfter, callnpass, rand } from '/lib/utils';
 import InstancingTransforms from '/lib/InstancingTransforms';
 import { OrbitControls } from 'three/addons/controls/OrbitControls';
 
@@ -37,7 +39,15 @@ const gui = new GUI({ title: 'Controls', closeFolders: true });
 const PARS = {
   size: 1,
   rotate: 0,
+  origin: true,
+  colorStart: { value: new Color(0x112256) },
+  colorStop: { value: new Color(0x24507a) },
 };
+gui.add(PARS, 'origin').onChange(v => sketch.scene[v?'add':'remove'](testMesh));
+gui.addColor(PARS.colorStart, 'value').name('colorStart')
+  .onChange(v => albedo.render());
+gui.addColor(PARS.colorStop, 'value').name('colorStop')
+  .onChange(v => albedo.render());
 
 const COUNT = circlesData.length;
 console.log({COUNT})
@@ -59,16 +69,22 @@ circleGeo.setAttribute('offset', new BufferAttribute(offsetAttr, 3));
 // geo.setAttribute('instanceId', inxAttr);
 
 const albedo = new QuadFrame({
+  type: sketch.computeTextureType,
   size: 500,
   material: new ShaderMaterial({
-    uniforms: {},
+    uniforms: {
+      colorStart: PARS.colorStart,
+      colorStop: PARS.colorStop,
+    },
     fragmentShader: `
+      uniform vec3 colorStart;
+      uniform vec3 colorStop;
       varying vec2 vUv;
 
       void main() {
         vec3 color = mix(
-          vec3(0.07450980392156863, 0.13333333333333333, 0.3176470588235294),
-          vec3(0.18823529411764706, 0.3254901960784314, 0.4823529411764706),
+          colorStart,
+          colorStop,
           vUv.x
         );
         gl_FragColor = vec4(color, 1.);
@@ -127,20 +143,23 @@ mesh.scale.multiplyScalar(1.4);
 mesh.position.set(1.8, 1, 0);
 sketch.scene.add(mesh);
 // const mesh = new Mesh(geo, mat);
-// sketch.scene.position.z = -4;
-sketch.camera = new OrthographicCamera(-1, 1, 1, -1, .000001, 50);
-sketch.camera.position.z = -2;
+sketch.scene.position.z = 2;
+const camera = sketch.camera = new OrthographicCamera(-1, 1, 1, -1, .000001, 50);
+// sketch.camera.position.z = -2;
 
-const testMesh = new Mesh(
+const testMesh = new Object3D();
+const testMesh1 = new Mesh(
   new BoxGeometry(),
   new MeshBasicMaterial({ color: 0xff6600, wireframe: true }),
 );
-// testMesh.rotation.x = 45;
-// testMesh.rotation.y = 45;
-const testMesh2 = testMesh.clone();
+const testMesh2 = testMesh1.clone();
 testMesh2.scale.multiplyScalar(.5);
+testMesh.add(testMesh1).add(testMesh2);
+
+
 sketch.scene.add(testMesh);
-sketch.scene.add(testMesh2);
+
+sketch.scene.background = albedo.texture;
 
 const orbit = new OrbitControls(sketch.camera, sketch.renderer.domElement);
 orbit.listenToKeyEvents( window );
@@ -149,8 +168,20 @@ handleResize();
 sketch.on('resize', handleResize);
 
 sketch.initStats();
+
+const camVel = new Vector3();
+const origin = new Vector3(0, 0, 2);
 sketch.startRaf(({ now, elapsed, delta }) => {
   transforms.forEach(t => t.rotation.z += .005);
+
+  (() => {
+    const drv = .0001;
+    camVel.add({ x: rand(-drv,drv), y: rand(-drv,drv), z: 0 });
+    camVel.clampLength(0, .01);
+    camera.position.add(camVel);
+    camera.position.clampLength(0, .1);
+    camera.lookAt(origin);
+  })()
 
   sketch.render();
 });
