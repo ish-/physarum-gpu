@@ -34,35 +34,37 @@ blocks.setBlur = (v) => {
   $cont.style.setProperty('--blur', px(v));
 };
 
-const p = 20;
-const $cont = createEl({ className: 'BlockList' },
-  Arr(30).map((_, i) => {
-    const top = i * 600 + rand.int(-150, 150);
-    const left = Math.max(p, W / 4 + rand.int(-W / 3, W / 3));
-    const width = rand.int(100, W - left - p);
-    const height = rand.int(30, H / 2);
-    const startTextInx = rand.int(0, LOREM.length / 2);
+function initBlocks () {
+  const p = 20;
+  const $cont = createEl({ className: 'BlockList' },
+    Arr(30).map((_, i) => {
+      const top = i * 600 + rand.int(-150, 150);
+      const left = Math.max(p, W / 4 + rand.int(-W / 3, W / 3));
+      const width = rand.int(100, W - left - p);
+      const height = rand.int(30, H / 2);
+      const startTextInx = rand.int(0, LOREM.length / 2);
 
-    const $block = createEl({
-      className: 'Block',
-      style: map({ top, left, width/*, height*/ }, px),
-    }, [
-      createEl({ textContent: LOREM.substr(startTextInx, rand.int(40, 160)) }),
-    ]);
+      const $block = createEl({
+        className: 'Block',
+        style: map({ top, left, width/*, height*/ }, px),
+      }, [
+        createEl({ textContent: LOREM.substr(startTextInx, rand.int(40, 160)) }),
+      ]);
 
-    observer.observe($block);
-    return $block;
-  }),
-);
+      observer.observe($block);
+      return $block;
+    }),
+  );
 
-$root.append($cont);
+  $root.append($cont);
 
-export let scroll = $cont.scrollTop;
-$cont.addEventListener('scroll', e => {
-  const { scrollTop } = $cont;
-  const delta = scrollTop - scroll;
-  scroll = scrollTop;
-  blocks.needRead = true;
-});
+  let scroll = $cont.scrollTop;
+  $cont.addEventListener('scroll', e => {
+    const { scrollTop } = $cont;
+    const delta = scrollTop - scroll;
+    scroll = scrollTop;
+    blocks.needRead = true;
+  });
+}
 
 export const initBlockDim = [-9999,-9999,0,0];

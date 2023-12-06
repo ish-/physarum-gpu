@@ -8,7 +8,7 @@ import {
   ShaderMaterial,
 } from 'three';
 
-import { gui, GuiUniforms } from '/lib/gui';
+import { GuiUniforms } from '/lib/gui-uniforms';
 import fragGlsl from './points.frag.glsl?raw';
 import vertGlsl from './points.vert.glsl?raw';
 

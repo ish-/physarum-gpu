@@ -57,21 +57,28 @@ vec4 compute () {
 
   float fer = clamp(0., blendAdd(nextFer, prevFer, opacity), uSensorFerLimit * 1.2);
   // float mouse = sdBox(translate(vUv, uPointer)*toAspect, vec2(.02, .02)) < 0. ? 1. : 0.;
-  float boxes = 0.;
-  for (int i = 0; i < 20; i++) {
-    vec4 dims = uBlocks[i];
-    vec2 uvPos = dims.xy / resolution;
-    if (uvPos.x < -100.)
-      break;
-    uvPos.x = 1. - uvPos.x;
-    vec2 uvSize = dims.zw / resolution;
-    // vec2 uvSize = vec2(.1, .1);
-    float box = sdBox(translate(vUv, 1. - uvPos)/* *toAspect */, uvSize) < 0. ? 20. : 0.;
-    boxes += box;
-  }
 
-  fer = fer /*+ mouse *//* + boxes */;
+  vec4 data = vec4(fer, 0., 0., 1.);
+
+  #ifdef USE_BLOCKS
+    float boxes = 0.;
+    for (int i = 0; i < 20; i++) {
+      vec4 dims = uBlocks[i];
+      vec2 uvPos = dims.xy / resolution;
+      if (uvPos.x < -100.)
+        break;
+      uvPos.x = 1. - uvPos.x;
+      vec2 uvSize = dims.zw / resolution;
+      // vec2 uvSize = vec2(.1, .1);
+      float box = sdBox(translate(vUv, 1. - uvPos)/* *toAspect */, uvSize) < 0. ? 20. : 0.;
+      boxes += box;
+    }
+    data.g = boxes;
+  #endif
+
+  // fer = fer /*+ mouse *//* + boxes */;
   // vec2 pointer = uPointer * resolution;
   // fer = clamp(0., fer + (1. - smoothstep(3., 7., distance(gl_FragCoord.xy, pointer))) * .3, .99);
-  return vec4(fer, boxes, 0., 1.);
+  // return vec4(fer, boxes, 0., 1.);
+  return data;
 }

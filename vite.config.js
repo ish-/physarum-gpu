@@ -10,6 +10,7 @@ const env = dotenv.config().parsed;
 // import { defineConfig } from 'vite';
 
 export default {
+  base: './',
   server: { https: true },
 
   define: {

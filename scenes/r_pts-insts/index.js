@@ -4,8 +4,9 @@ import {
   RepeatWrapping, LinearFilter, ShaderMaterial,
   Vector2, Vector4, OrthographicCamera } from 'three';
 
-import { Arr, lerp, rerange } from '/lib/utils';
-import { gui, GuiUniforms, Presets, ctrlWidth, setSkipGui } from '/lib/gui';
+import { Arr, lerp, rerange, guiCtrlWidth } from '/lib/utils';
+import { GuiUniforms } from '/lib/gui-uniforms';
+import { GuiPresets } from '/lib/gui-presets';
 import Feedback from '/lib/Feedback';
 import QuadFrame from '/lib/QuadFrame';
 import NoiseFrame from '/lib/NoiseFrame';
@@ -22,8 +23,10 @@ import { MicAnalyzer } from '/lib/MicAnalyzer';
 import createInstances from './instances.js';
 // import { $video, videoTexture } from './cameraMedia';
 // import edgeGlsl from '/shaders/edge.glsl';
-import { blocks, scroll, initBlockDim, MAX_BLOCKS } from './blocks';
+import { blocks, initBlockDim, MAX_BLOCKS } from './blocks';
 import blocksGlsl from './blocks.glsl';
+
+const USE_BLOCKS = 0;
 
 // INIT
 Object.assign(sketch.renderer.domElement.style, {
@@ -36,22 +39,21 @@ const DEFAULT_COUNT_SQ = touchable ? 80 : 200;
 // countSq from url ?query
 const countSq = parseInt(window.location.search.split('?')?.[1]) || DEFAULT_COUNT_SQ;
 
-Presets();
+const guiProm = sketch.initGui();
+GuiPresets(guiProm);
+GuiUniforms.gui = guiProm;
 sketch
-  .initGui()
   .initKeys()
   .initPointer()
   .initStats();
 
 // THIS CONTROLS
 const params = {
-  showBlocks: true,
+  // showBlocks: true,
   blocksBlur: 0,
   mic: false,
   micVol: 0,
 };
-ctrlWidth(30, gui.add(params, 'showBlocks').onChange(v => {blocks.setActive(v)}));
-ctrlWidth(70, gui.add(params, 'blocksBlur', 0, 10, 1).onChange(v => {blocks.setBlur(v)}));
 
 const modulation = {
   micVol: 0,
@@ -73,22 +75,31 @@ function micOnRender ({ now }) {
   modulation.micVolMin = micVolMin;
   modulation.micVol = rerange(micVolMin, 1, 0, 1, vol);
 }
-gui.add(params, 'mic').onChange(async v => {
-  if (v) {
-    mic = await new MicAnalyzer();
-    sketch.on('render', micOnRender);
-  } else {
-    sketch.off('render', micOnRender);
-    modulation.micVol = 0;
+
+guiProm.then(gui => {
+  if (USE_BLOCKS) {
+    guiCtrlWidth(30, gui.add(params, 'showBlocks').onChange(v => {
+      blocks.setActive(v);
+    }));
+    guiCtrlWidth(70, gui.add(params, 'blocksBlur', 0, 10, 1).onChange(v => {blocks.setBlur(v)}));
   }
-});
-gui.add(modulation, 'micVol', 0, 1).listen();
-gui.add(modulation, 'micVolMin', 0, 1).listen();
+  gui.add(params, 'mic').onChange(async v => {
+    if (v) {
+      mic = await new MicAnalyzer();
+      sketch.on('render', micOnRender);
+    } else {
+      sketch.off('render', micOnRender);
+      modulation.micVol = 0;
+    }
+  });
+  gui.add(modulation, 'micVol', 0, 1).listen();
+  gui.add(modulation, 'micVolMin', 0, 1).listen();
+})
 
 
 
 ///////////// COMPONENTS
-setSkipGui(true);
+GuiUniforms.skip = true;
 const initVelFrame = new NoiseFrame({ name: 'initVel', size: countSq, normalize: true })
   .render();
 const initPosFrame = new NoiseFrame({
@@ -126,7 +137,7 @@ const posFB = new Feedback({
   }
 });
 
-setSkipGui(false);
+GuiUniforms.skip = false;
 const velFB = new Feedback({
   name: 'velFB',
   initTexture: initVelFrame.texture,
@@ -173,7 +184,10 @@ const ferFB = new Feedback({
   name: 'ferFB',
   wrap: RepeatWrapping,
   filter: LinearFilter,
-  defines: { MAX_BLOCKS },
+  defines: {
+    MAX_BLOCKS,
+    ...(USE_BLOCKS ? {USE_BLOCKS} : null)
+  },
   uniforms: GuiUniforms('ferFB', {
     opacity: [.98, 0.9, 1., .001],
     // blur: [0., 0., 2., .01],
@@ -198,6 +212,7 @@ const postFx = new QuadFrame({
     uniforms: GuiUniforms('postFx', {
       usePalette: true,
       uPalette: {
+        type: 'vec3',
         value: palettes[1],
         opts: palettes.reduce((opts, p, i) => Object.assign(opts, { [`Palette ${i}`]: p }), {}),
       },
@@ -289,7 +304,8 @@ sketch.startRaf(({ now, elapsed, delta }) => {
   postFx.render();
   debug(postFx);
 
-  handleBlocks();
+  if (USE_BLOCKS)
+    handleBlocks();
 });
 
 function handleBlocks () {
