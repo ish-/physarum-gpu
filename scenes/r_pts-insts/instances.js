@@ -19,7 +19,7 @@ export default function (countSq, tPos, aspect) {
     // defines: {
     //   // INSTANCED: '',
     // },
-    uniforms: GuiUniforms('agents', {
+    uniforms: GuiUniforms('Agents', {
       uIntensity: [.2, 0.001, 2, .01],
       pointSize: [1.5, .1, 5],
     }, {

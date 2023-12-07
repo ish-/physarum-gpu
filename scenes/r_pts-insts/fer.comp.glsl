@@ -1,8 +1,11 @@
 uniform float opacity;
 uniform float blur;
-uniform vec2 uPointer;
+uniform vec2 sceneRes;
+uniform vec3 uPointer;
+uniform float time;
 uniform float uSensorFerLimit;
-// uniform sampler2D tVideo;
+uniform float useCamera;
+uniform sampler2D tVideo;
 
 vec4 blur5(sampler2D image, vec2 uv, vec2 resolution, vec2 direction) {
   vec4 color = vec4(0.0);
@@ -47,18 +50,62 @@ vec3 blendAdd(vec3 base, vec3 blend, float opacity) {
 }
 
 vec4 compute () {
+  // vec2 vUv = vUv.xy;
   vec2 toAspect = vec2(aspect, 1.);
   // prev = blur5( tPrev, vUv, resolution.xy, normalize(vUv*2.-1.));
   // float prevFer = myBlur( tPrev, vUv, 1./resolution.xy, vec2(1., 0.));
-  float prevFer = texture2D( tPrev, vUv).r;
-  float nextFer = texture2D( tInput, vUv /* / vec2(aspect, 1.) */ ).r;
-  // vec3 video = texture2D (tVideo, vUv).rgb;
-  // vec3 video = 1. - edge(tVideo, vUv, resolution).rgb;
+  vec4 prevData = texture2D( tPrev, vUv);
+  vec4 nextData = texture2D( tInput, vUv);
 
-  float fer = clamp(0., blendAdd(nextFer, prevFer, opacity), uSensorFerLimit * 1.2);
+  float prevFer = prevData.r;
+  float nextFer = texture2D( tInput, vUv /* / vec2(aspect, 1.) */ ).r;
+  if (useCamera > 0.) {
+    vec3 video = (1. - texture2D (tVideo, vec2(1. - vUv.x, vUv.y)).rgb) / 1.;
+    // vec3 video = 1. - edge(tVideo, vUv, resolution).rgb;
+
+    nextFer = mix(nextFer, video.r, .03);
+  }
+
+  // float speed = .6;
+  // float seed = 1.;
+  // float scale = 1.;
+  // float octaves = 1.;
+  // float lacunarity = 10.;
+  // float diminish = 1.;
+  // float noise = 1. - mx_worley_noise_float(
+  //   vec3(vUv, time*speed + seed) * scale,
+  //   1.5, 5
+  // );
+  // prevFer += noise / 1000.;
+  // ------
+  // float noise = mx_fractal_noise_float(
+  //   vec3(vUv, time*speed + seed) * scale,
+  //   int(octaves),
+  //   lacunarity,
+  //   diminish
+  // );
+  // fer += noise / 1000.;
+  // float noise = mx_perlin_noise_float(vec3(vUv, time*speed + seed) * scale);
+  // nextFer += noise / 50.;
+  float prevWay = prevData.g;
+  float way = prevWay;
+  float pointerDown = uPointer.z * 2. - 1.;
+  if (pointerDown > 0.) {
+    // vec2 pointer = uPointer.xy * vec2(sceneRes.x/sceneRes.y, 1.);
+    vec2 pointer = uPointer.xy;
+    float dist = length(pointer * sceneRes - vUv * sceneRes);
+    float nextWay = (1. - smoothstep(0., 500., pow(dist, 2.))) * .4;
+    way = clamp(0., .4, way + nextWay);
+    // way = dist < 50. ? 1. : 0.;
+  }
+
+  float fer = clamp(0., blendAdd(nextFer, prevFer, opacity), /* (1. - noise) *  */uSensorFerLimit * 1.2);
+
+
+
   // float mouse = sdBox(translate(vUv, uPointer)*toAspect, vec2(.02, .02)) < 0. ? 1. : 0.;
 
-  vec4 data = vec4(fer, 0., 0., 1.);
+  vec4 data = vec4(fer, way, 0., 1.);
 
   #ifdef USE_BLOCKS
     float boxes = 0.;

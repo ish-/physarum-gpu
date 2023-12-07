@@ -37,6 +37,6 @@ void main() {
       noise = toRange(-1., 1., range[0], range[1], noise);
     #endif
   #endif
-
   gl_FragColor = vec4(noise, 1.);
+  // <handle>
 }

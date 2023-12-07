@@ -9,6 +9,7 @@ uniform float uSensorFerLimit;
 uniform float uMaxTurnAng;
 uniform float uSpeed;
 uniform float uNoiseStr;
+uniform float time;
 
 uniform bool uInteractive;
 
@@ -16,6 +17,8 @@ uniform vec3 uPointer;
 uniform sampler2D tFer;
 uniform sampler2D tPos;
 uniform sampler2D tVelNoise;
+
+float invlerp (float x, float y, float a) { return (a - x) / (y - x); }
 
 // <functions>
 vec2 rotate(vec2 v, float a) {
@@ -53,21 +56,25 @@ vec4 compute () {
   float sFer2 = _sFer2.r + _sFer2.g;
   float fer2 = sFer2 > uSensorFerLimit ? sFer2 * -1. : sFer2;
 
+  // float scale = 1.;
+  // float speed = .3;
+  // float noise = mx_perlin_noise_float(vec3(pos, time*speed + 3.13) * scale);
+
   vec2 vel = (nVel + velNoise.xy * uNoiseStr)/*  * uSpeed */;
-  vel = rotate(vel, TURN_ANG * sign(fer1 - fer2) * 1.5);
+  vel = rotate(vel, TURN_ANG * sign(fer1 - fer2) * 1.5/*  + noise / 2. */);
 
   // vel = normalize(vel) * uSpeed;
   vel = vel * uSpeed;
 
-  if (uInteractive) {
-    float pointerDown = uPointer.z * 2. - 1.;
-    vec2 pointer = uPointer.xy * vec2(sceneRes.x/sceneRes.y, 1.);
-    vec2 dir = (pos.xy - pointer.xy);
-    float dist = length(dir);
-    float str = (1. - smoothstep(0.03, .1 + .2 * uPointer.z, pow(dist, 2.))) * 2.;
+  // if (uInteractive) {
+  //   float pointerDown = uPointer.z * 2. - 1.;
+  //   vec2 pointer = uPointer.xy * vec2(sceneRes.x/sceneRes.y, 1.);
+  //   vec2 dir = (pos.xy - pointer.xy);
+  //   float dist = length(dir);
+  //   float str = (1. - smoothstep(0.03, .1 + .2 * uPointer.z, pow(dist, 2.))) * 2.;
 
-    vel = vel + normalize(dir) * str * pointerDown * uSpeed / 3.;
-  }
+  //   vel = vel + normalize(dir) * str * pointerDown * uSpeed / 3.;
+  // }
 
   // pos = toRangeFract(vec2(-aspect, -1), vec2(aspect, 1), pos);
   return vec4(vel, 0., 1.);

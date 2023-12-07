@@ -1,5 +1,6 @@
 uniform float damp;
 
+uniform sampler2D tInit;
 uniform sampler2D tPrev;
 uniform sampler2D tInput;
 uniform int thisFrame;
@@ -25,9 +26,7 @@ void main() {
     gl_FragColor = resetColor;
     return;
   }
-
   // vec4 prev = texture2D( tPrev, vUv );
-
   vec4 res = vec4(0.);
   #ifdef defineCompute
     res = _compute();
@@ -36,10 +35,8 @@ void main() {
   //   vec4 inp = texture2D( tInput, vUv );
   //   res = prev + inp * .01;
   // #endif
-
   // #ifdef damping
   //   res = vec4(blendAdd(prev.rgb, res.rgb, damp), prev.a);
   // #endif
-
   gl_FragColor = res;
 }
