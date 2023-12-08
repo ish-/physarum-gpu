@@ -16,6 +16,7 @@ import {
   Color,
 } from 'three';
 
+import { paramsToQuery, setQueryToParams } from '/lib/params';
 import InstancingTransforms from '/lib/InstancingTransforms';
 import QuadFrame from '/lib/QuadFrame';
 import defaultUvVertGlsl from '/shaders/defaultUv.vert.glsl?raw';
@@ -25,8 +26,11 @@ import circlesData from './circles.half.json';
 
 import { insertAfter, callnpass, rand, toFixed, modifyShader, modifyMatShader, hash2 } from '/lib/utils';
 
+const query = parseQuery(window.location.search);
+const queryParNames = ['size',/*'rotateStep','rotateSpeed',*/'colorStart','colorStop','pulseWidth','pulseDuration','pulseColor', 'pulseSmooth', 'pulseInterval','pulseIntervalRand'/*, 'pulseIntensity'*/];
+
 sketch.dpi = 1;
-// sketch.initKeys();
+sketch.initKeys();
 
 const COUNT = circlesData.length;
 
@@ -37,14 +41,19 @@ const PARS = {
   origin: false,
   colorStart: { value: new Color(0x112256) },
   colorStop: { value: new Color(0x24507a) },
+  pulseColor: { value: new Color(0xffffff) },
   pulseLerp: { value: 0 },
   pulseWidth: { value: .8 },
+  pulseSmooth: { value: .5 },
+  // pulseIntensity: { value: 1 },
   pulseDuration: 2,
   pulseInterval: 5,
   pulseIntervalRand: 1,
   pulse,
   pulsePlay: true,
 };
+
+setQueryToParams(PARS, query, queryParNames);
 
 const circleGeo = new CircleGeometry(.4, 64);
 const offsetAttr = new Float32Array(COUNT * 3);
@@ -76,6 +85,9 @@ modifyMatShader(mat, {
   uniforms: {
     pulseLerp: PARS.pulseLerp,
     pulseWidth: PARS.pulseWidth,
+    pulseSmooth: PARS.pulseSmooth,
+    pulseColor: PARS.pulseColor,
+    // pulseIntensity: PARS.pulseIntensity,
   },
   vertex: `//! PREPEND
     varying float vInstanceZ;
@@ -127,33 +139,51 @@ sketch.scene.background = albedo.texture;
 handleResize();
 sketch.on('resize', handleResize);
 
-// sketch.initGui({ reset: false }).then(gui => {
-//   gui.add(PARS, 'origin').onChange(toggleOrigin);
-//   gui.add(PARS, 'size', .0001, 10, .001).onChange(setScale);
-//   gui.add(PARS, 'rotateStep', 0, 100, .1).onChange(setRotation);
-//   gui.add(PARS, 'rotateSpeed', 0, 50, .001).onChange(v => v === 0 && setRotation());
-//   gui.addColor(PARS.colorStart, 'value').name('colorStart')
-//     .onChange(v => albedo.render());
-//   gui.addColor(PARS.colorStop, 'value').name('colorStop')
-//     .onChange(v => albedo.render());
-//   gui.add(PARS.pulseLerp, 'value', 0, 1, .001).name('pulseLerp').listen();
-//   gui.add(PARS.pulseWidth, 'value', 0, 2, .001).name('pulseWidth').listen();
-//   gui.add(PARS, 'pulseDuration', 0.001, 10, .01);
-//   gui.add(PARS, 'pulse');
-//   gui.add(PARS, 'pulseInterval', 0.1, 30, .01).onChange(pulseInterval);
-//   gui.add(PARS, 'pulseIntervalRand', 0, 10, .1);
-//   gui.add(PARS, 'pulsePlay').onChange(v => v ? pulseInterval() : clearTimeout(pulseIi));
-// });
+if (query.gui) {
+  sketch.initGui({ reset: false }).then(gui => {
+    // gui.add(PARS, 'origin').onChange(toggleOrigin);
+    gui.add(PARS, 'size', .0001, 10, .001).onChange(setScale);
+    // gui.add(PARS, 'rotateStep', 0, 100, .1).onChange(setRotation);
+    // gui.add(PARS, 'rotateSpeed', 0, 50, .001).onChange(v => v === 0 && setRotation());
+    gui.addColor(PARS.colorStart, 'value').name('colorStart')
+      .onChange(v => albedo.render());
+    gui.addColor(PARS.colorStop, 'value').name('colorStop')
+      .onChange(v => albedo.render());
+    gui.addColor(PARS.pulseColor, 'value').name('pulseColor')
+    gui.add(PARS.pulseLerp, 'value', 0, 1, .001).name('pulseLerp').listen();
+    gui.add(PARS.pulseWidth, 'value', 0, 2, .001).name('pulseWidth');
+    gui.add(PARS.pulseSmooth, 'value', 0, 1, .001).name('pulseSmooth');
+    // gui.add(PARS.pulseIntensity, 'value', -10, 10, .001).name('pulseIntensity');
+    gui.add(PARS, 'pulseDuration', 0.001, 10, .01);
+    gui.add(PARS, 'pulseInterval', 0.1, 30, .01).onChange(pulseInterval);
+    gui.add(PARS, 'pulseIntervalRand', 0, 10, .1);
+    gui.add(PARS, 'pulse');
+    gui.add(PARS, 'pulsePlay').onChange(v => v ? pulseInterval() : clearTimeout(pulseIi));
 
-// const INFO = {
-//   camRot: '',
-//   camPos: '',
-// }
-// gui.add(INFO, 'camRot').listen();
-// gui.add(INFO, 'camPos').listen();
+    const INFO = {
+      camRot: '',
+      camPos: '',
+      saveToQuery () {
+        const query = paramsToQuery(PARS, queryParNames);
+        window.location.search = query },
+    };
+    // gui.add(INFO, 'camRot').listen();
+    // gui.add(INFO, 'camPos').listen();
+    gui.add(INFO, 'saveToQuery');
 
-// sketch.initOrbitCtrl();
-// sketch.initStats();
+    // sketch.on('render' , () => {
+    //   const { camera: c } = sketch;
+    //   const r = c.rotation;
+    //   INFO.camRot = `${toFixed(r.x)},${toFixed(r.y)},${toFixed(r.z)}`;
+    //   const p = c.position;
+    //   INFO.camPos = `${toFixed(p.x)},${toFixed(p.y)},${toFixed(p.z)},${toFixed(c.zoom)}`;
+    // })
+    // sketch.initOrbitCtrl();
+    // sketch.initStats();
+  });
+}
+
+
 
 pulse();
 let pulseIi = setTimeout(pulseInterval);
@@ -184,14 +214,6 @@ sketch.startRaf(({ now, elapsed, delta }) => {
     camera.lookAt(origin);
     camera.updateMatrix();
   })();
-
-  // (() => {
-  //   const { camera: c } = sketch;
-  //   const r = c.rotation;
-  //   INFO.camRot = `${toFixed(r.x)},${toFixed(r.y)},${toFixed(r.z)}`;
-  //   const p = c.position;
-  //   INFO.camPos = `${toFixed(p.x)},${toFixed(p.y)},${toFixed(p.z)},${toFixed(c.zoom)}`;
-  // })()
 
   sketch.render();
 });
@@ -241,3 +263,23 @@ function pulseInterval (
     pulseInterval();
   }, time * 1e3);
 }
+function parseQuery (query) {
+  const params = new URLSearchParams(query);
+
+  const result = {};
+  for (const [name, value] of params) {
+    result[name] = decodeURIComponent(value);
+  }
+
+  return result;
+}
+
+let repeats = 0;
+window.addEventListener('keydown', e => {
+  if (e.code === 'KeyG' && e.shiftKey && e.ctrlKey) {
+    repeats++;
+    if (repeats > 2)
+      window.location.search += '&gui=1';
+    setTimeout(() => { repeats = 0}, 1e3);
+  }
+});

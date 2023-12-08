@@ -2,6 +2,7 @@
 // const glsl = require('vite-plugin-glsl');
 import glslify from  'vite-plugin-glslify';
 import mkcert from 'vite-plugin-mkcert';
+import { viteSingleFile } from "vite-plugin-singlefile"
 
 import dotenv from 'dotenv';
 
@@ -32,6 +33,7 @@ export default {
     // glsl()
     glslify(),
     mkcert(),
+    // viteSingleFile(),
   ],
 
   resolve: {
