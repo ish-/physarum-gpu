@@ -26,6 +26,7 @@ import UserCamera from './UserCamera.js';
 import edgeGlsl from '/shaders/edge.glsl';
 import { blocks, initBlockDim, MAX_BLOCKS } from './blocks';
 import blocksGlsl from './blocks.glsl';
+import builtinPresets from './presets';
 
 const USE_BLOCKS = 0;
 let userCamera;
@@ -43,7 +44,7 @@ const DEFAULT_COUNT_SQ = touchable ? 80 : 200;
 const countSq = parseInt(window.location.search.split('?')?.[1]) || DEFAULT_COUNT_SQ;
 
 const guiProm = sketch.initGui();
-GuiPresets(guiProm);
+GuiPresets(guiProm, builtinPresets);
 GuiUniforms.gui = guiProm;
 sketch
   .initKeys()
@@ -146,7 +147,7 @@ const posFB = new Feedback({
   size: countSq,
   uniforms: GuiUniforms('posFB', {
     uCountSq: [countSq, 0, countSq],
-    uLife: [30., .1, 200.],
+    uLife: [0., 0., 200.],
   }, {
     uZoom: 1,
     uPointer: sketch.pointer,
@@ -175,7 +176,7 @@ const posFB = new Feedback({
       float life = pointData.b + .016;
       pos = pos + texture2D(tVel, vUv).xy * uSpeed * SPEED;
       int inx = inxFromUv(ivec2(vUv * resolution), ivec2(resolution));
-      if (life > uLife) {
+      if (uLife > 0. && life > uLife) {
         //pos = vec2(.5, .5);
         pos = uPointer.xy * vec2(sceneRes.x/sceneRes.y, 1.) * pow(uZoom, 1./3.);
         life = toRange(-1000., 1000., 0., uLife, texture2D(tInit, vUv).b);
@@ -183,8 +184,8 @@ const posFB = new Feedback({
 
       if (inx > uCountSq*uCountSq)
         pos = vec2(-10, -10.);
-      // else
-      //   pos = toRangeFract(vec2(0., 0.), vec2(aspect, 1), pos);
+      else
+        pos = toRangeFract(vec2(0., 0.), vec2(aspect, 1), pos);
 
       return vec4(pos, life, 1.);
     }`,
@@ -319,7 +320,7 @@ const postFx = new QuadFrame({
         vec4 ferData = texture2D(tColor, vUv);
         float fer = texture2D(tColor, vUv).r;
         float way = texture2D(tColor, vUv).g;
-        vec3 col = vec3(fer, fer - way * .3, fer);
+        vec3 col = vec3(fer, fer - way * .8, fer);
 
         if (usePalette) {
           vec3 pCol = palette(pow(fer, uPow) + time, uPalette[0], uPalette[1], uPalette[2], uPalette[3]);

@@ -66,15 +66,15 @@ vec4 compute () {
   // vel = normalize(vel) * uSpeed;
   vel = vel * uSpeed;
 
-  // if (uInteractive) {
-  //   float pointerDown = uPointer.z * 2. - 1.;
-  //   vec2 pointer = uPointer.xy * vec2(sceneRes.x/sceneRes.y, 1.);
-  //   vec2 dir = (pos.xy - pointer.xy);
-  //   float dist = length(dir);
-  //   float str = (1. - smoothstep(0.03, .1 + .2 * uPointer.z, pow(dist, 2.))) * 2.;
+  if (uInteractive && uPointer.z != 0.) {
+    float pointerDown = uPointer.z * -1./*  * 2. - 1. */;
+    vec2 pointer = uPointer.xy * vec2(sceneRes.x/sceneRes.y, 1.);
+    vec2 dir = (pos.xy - pointer.xy);
+    float dist = length(dir);
+    float str = (1. - smoothstep(0.03, -.1 + .2 * abs(uPointer.z), pow(dist, 2.))) * 2. * sign(uPointer.z);
 
-  //   vel = vel + normalize(dir) * str * pointerDown * uSpeed / 3.;
-  // }
+    vel = vel + normalize(dir) * str * pointerDown * uSpeed / 3.;
+  }
 
   // pos = toRangeFract(vec2(-aspect, -1), vec2(aspect, 1), pos);
   return vec4(vel, 0., 1.);

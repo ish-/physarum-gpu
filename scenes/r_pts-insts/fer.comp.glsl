@@ -89,13 +89,13 @@ vec4 compute () {
   // nextFer += noise / 50.;
   float prevWay = prevData.g;
   float way = prevWay;
-  float pointerDown = uPointer.z * 2. - 1.;
-  if (pointerDown > 0.) {
+  float pointerDown = uPointer.z;
+  if (pointerDown != 0.) {
     // vec2 pointer = uPointer.xy * vec2(sceneRes.x/sceneRes.y, 1.);
     vec2 pointer = uPointer.xy;
     float dist = length(pointer * sceneRes - vUv * sceneRes);
     float nextWay = (1. - smoothstep(0., 500., pow(dist, 2.))) * .4;
-    way = clamp(0., .4, way + nextWay);
+    way = clamp(0., .4, (way + nextWay) * pointerDown);
     // way = dist < 50. ? 1. : 0.;
   }
 
